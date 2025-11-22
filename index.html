@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // MOBILE</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>NEURAL_LINK // V11.2</title>
+    <!-- 更换为 unpkg 源，国内访问更稳 -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
     
     <style>
-        /* 引入中文字体：站酷黄油体(标题工业感) + Noto Sans(正文易读) */
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap');
 
         :root {
@@ -18,7 +18,6 @@
             --neon-pink: #ff0055;
             --neon-yellow: #fcee0a;
             --ui-border: rgba(255, 255, 255, 0.2);
-            /* 字体定义 */
             --font-title: 'ZCOOL QingKe HuangYou', cursive;
             --font-body: 'Noto Sans SC', sans-serif;
         }
@@ -31,17 +30,16 @@
             color: #e0f0ff;
             font-family: var(--font-body);
             height: 100vh;
-            overflow: hidden; /* 禁止整个页面滚动 */
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
-        /* --- BACKGROUND LAYERS --- */
         #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
         .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(circle, transparent 40%, #000 100%); }
         .scanlines { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; }
 
-        /* --- INTRO LAYER --- */
+        /* INTRO */
         #intro-layer {
             position: fixed; inset: 0; z-index: 9000;
             background: #000;
@@ -59,43 +57,28 @@
         .zoom-effect { animation: zoomIn 2.5s forwards ease-in; }
         @keyframes zoomIn { 0% { transform: scale(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(60); opacity: 0; } }
 
-        /* --- MAIN TERMINAL (Flex Layout) --- */
+        /* TERMINAL */
         #terminal {
-            position: relative; z-index: 100;
-            width: 100%; height: 100%;
-            display: flex; 
-            flex-direction: column; /* 垂直排列 */
+            position: relative; z-index: 100; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
             visibility: hidden; opacity: 0;
             transition: opacity 0.5s ease-in;
         }
 
-        /* 1. HEADER */
         header {
-            height: 40px;
-            padding: 0 15px;
-            border-bottom: 1px solid var(--ui-border);
+            height: 40px; padding: 0 15px; border-bottom: 1px solid var(--ui-border);
             display: flex; justify-content: space-between; align-items: center;
             background: rgba(0, 0, 0, 0.6);
             font-family: var(--font-title); letter-spacing: 1px; font-size: 1rem;
         }
 
-        /* 2. VISUAL (Mobile Optimized) */
         #visual-container {
-            position: relative;
-            width: 100%;
-            /* 关键：手机上限制高度，留给文字 */
-            height: 30vh; 
-            min-height: 200px; 
-            max-height: 300px;
-            border-bottom: 1px solid var(--ui-border);
-            overflow: hidden; background: #000;
-            flex-shrink: 0; /* 禁止被压缩 */
+            position: relative; width: 100%; height: 30vh; min-height: 200px; max-height: 300px;
+            border-bottom: 1px solid var(--ui-border); overflow: hidden; background: #000; flex-shrink: 0;
         }
         #scene-img {
-            width: 100%; height: 100%; object-fit: cover;
-            opacity: 0; transition: opacity 0.5s ease;
-            image-rendering: pixelated; 
-            filter: contrast(1.2) brightness(0.9) sepia(0.3) hue-rotate(170deg) saturate(0.6);
+            width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease;
+            image-rendering: pixelated; filter: contrast(1.2) brightness(0.9) sepia(0.3) hue-rotate(170deg) saturate(0.6);
         }
         .overlay-ui {
             position: absolute; top: 10px; left: 10px;
@@ -104,11 +87,8 @@
             z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 2px;
         }
 
-        /* 3. CONTENT (Scrollable) */
         #content-scroll {
-            flex: 1; /* 占据剩余所有空间 */
-            overflow-y: auto; /* 只有这里滚动 */
-            padding: 20px;
+            flex: 1; overflow-y: auto; padding: 20px;
             display: flex; flex-direction: column; gap: 15px;
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.4));
         }
@@ -116,23 +96,17 @@
         .msg-block {
             padding-left: 12px; border-left: 3px solid #333;
             opacity: 0; transform: translateY(10px); transition: all 0.5s ease;
-            font-size: 1rem; line-height: 1.6; color: #ddd;
-            text-shadow: 0 0 2px rgba(0,0,0,0.8);
+            font-size: 1rem; line-height: 1.6; color: #ddd; text-shadow: 0 0 2px rgba(0,0,0,0.8);
         }
         .msg-block.show { opacity: 1; transform: translateY(0); }
-        
         .stage-1 { border-color: var(--neon-cyan); color: #d0ffff; }
         .stage-2 { border-color: var(--neon-pink); color: #ffd0d0; }
         .stage-3 { border-color: var(--neon-yellow); color: #ffffd0; font-weight: bold;}
 
-        /* 4. CONTROLS (Bottom Fixed) */
         #controls-area {
-            flex-shrink: 0;
-            border-top: 1px solid var(--ui-border);
-            background: rgba(0,0,0,0.9);
-            padding-bottom: env(safe-area-inset-bottom); /* 适配全面屏底部 */
+            flex-shrink: 0; border-top: 1px solid var(--ui-border);
+            background: rgba(0,0,0,0.9); padding-bottom: env(safe-area-inset-bottom);
         }
-
         #next-trigger {
             text-align: center; padding: 15px; color: #888; cursor: pointer;
             font-family: var(--font-title); font-size: 1.1rem; letter-spacing: 2px;
@@ -147,15 +121,12 @@
         #controls.active { opacity: 1; pointer-events: all; }
 
         .cyber-btn {
-            background: rgba(10, 15, 20, 0.95); border: none; 
-            color: var(--neon-cyan);
-            padding: 20px 10px; /* 增加点击区域 */
-            font-family: var(--font-title); font-size: 1.2rem; letter-spacing: 1px;
+            background: rgba(10, 15, 20, 0.95); border: none; color: var(--neon-cyan);
+            padding: 20px 10px; font-family: var(--font-title); font-size: 1.2rem; letter-spacing: 1px;
             cursor: pointer; transition: all 0.2s;
         }
         .cyber-btn:active { background: var(--neon-cyan); color: #000; }
 
-        /* SETUP MODAL */
         #modal {
             position: fixed; inset: 0; z-index: 10000; background: #000;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -168,7 +139,6 @@
             color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.5rem;
             cursor: pointer; box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
         }
-
     </style>
 </head>
 <body>
@@ -177,20 +147,17 @@
 <div class="vignette"></div>
 <div class="scanlines"></div>
 
-<!-- SETUP -->
 <div id="modal">
     <h1>神经漫游</h1>
-    <p>NEURAL LINK V11.1</p>
+    <p>NEURAL LINK V11.2</p>
     <button class="start-btn" onclick="bootSystem()">连接网络 (JACK IN)</button>
 </div>
 
-<!-- INTRO -->
 <div id="intro-layer" style="display:none">
     <div id="intro-content" class="intro-text"></div>
     <div id="the-door" class="door-frame"></div>
 </div>
 
-<!-- TERMINAL -->
 <div id="terminal">
     <header>
         <div>NET: <span style="color:var(--neon-cyan)">ONLINE</span></div>
@@ -201,7 +168,7 @@
         <img id="scene-img" src="" alt="">
         <div class="overlay-ui">
             <span>LOC: <span id="loc-id">加载中...</span></span>
-            <span id="loading-hint" style="color:var(--neon-yellow); margin-left:10px">正在获取视觉信号...</span>
+            <span id="loading-hint" style="color:var(--neon-yellow); margin-left:10px">信号接入中...</span>
         </div>
     </div>
 
@@ -226,50 +193,50 @@
     let currentStage = 0;
     let firstChapterPromise = null;
     let preBuffer = { A: null, B: null };
-    let mouseX = 0, mouseY = 0;
 
-    // --- 启动逻辑 ---
     function bootSystem() {
-        document.getElementById('modal').style.display = 'none';
-        initParticles(); 
-        const introPromise = playIntroSequence();
-        firstChapterPromise = fetchChapterData("START_GAME", true);
-
-        introPromise.then(async () => {
-            const introLayer = document.getElementById('intro-layer');
-            introLayer.style.opacity = 0;
-            setTimeout(() => introLayer.style.display = 'none', 1000);
+        try {
+            document.getElementById('modal').style.display = 'none';
             
-            const term = document.getElementById('terminal');
-            term.style.visibility = 'visible';
-            term.style.opacity = 1;
+            // 尝试加载特效，如果失败（比如 Three.js 没加载），捕获错误不影响流程
+            try { initParticles(); } catch(e) { console.warn("Visuals failed:", e); }
+            
+            const introPromise = playIntroSequence();
+            firstChapterPromise = fetchChapterData("START_GAME", true);
 
-            const pkg = await firstChapterPromise;
-            if(pkg) renderChapter(pkg, true);
-        });
+            introPromise.then(async () => {
+                const introLayer = document.getElementById('intro-layer');
+                introLayer.style.opacity = 0;
+                setTimeout(() => introLayer.style.display = 'none', 1000);
+                
+                const term = document.getElementById('terminal');
+                term.style.visibility = 'visible';
+                term.style.opacity = 1;
+
+                const pkg = await firstChapterPromise;
+                if(pkg) renderChapter(pkg, true);
+            });
+        } catch (err) {
+            alert("启动失败: " + err.message);
+        }
     }
 
-    // --- 后端 API 调用 (Prompt 已改为中文) ---
     async function callGemini(userText) {
         const sysPrompt = `
         你是一个赛博朋克风格的文字冒险游戏GM。
-        
         【核心规则】
-        1. 语言必须是 **中文 (Chinese Simplified)**。文风要冷峻、硬核、带点翻译腔的赛博朋克味。
-        2. 剧情要紧凑，冲突激烈。
-        3. 输出必须是纯 JSON 格式。不要 Markdown。
+        1. 语言必须是 **中文 (Chinese Simplified)**。
+        2. 剧情紧凑，冲突激烈。
+        3. 输出必须是纯 JSON 格式。
         
-        【JSON 格式要求】
+        JSON 格式:
         {
-            "image_keyword": "提取一个具体的英文单词(名词)，用于生成图片 (例如: gun, rain, neon, robot, eye, alley)",
-            "stage_1_env": "第一段：环境描写。视觉、听觉、气味。100字左右。",
-            "stage_2_event": "第二段：突发事件。发生了什么？谁出现了？80字左右。",
-            "stage_3_analysis": "第三段：危机分析。主角现在的处境和心理。50字左右。",
+            "image_keyword": "提取一个具体的英文名词(例如: gun, rain, neon, robot, eye, alley)",
+            "stage_1_env": "第一段：环境描写。100字左右。",
+            "stage_2_event": "第二段：突发事件。80字左右。",
+            "stage_3_analysis": "第三段：危机分析。50字左右。",
             "is_game_over": false,
-            "choices": [
-                {"text": "选项A的中文描述 (短促有力)"}, 
-                {"text": "选项B的中文描述 (短促有力)"}
-            ]
+            "choices": [{"text": "选项A中文"}, {"text": "选项B中文"}]
         }
         `;
         
@@ -289,14 +256,13 @@
             return JSON.parse(data.text.replace(/```json|```/g, "").trim());
         } catch (e) {
             console.error(e);
-            alert("连接神经中枢失败，请刷新页面。");
+            alert("连接中断: " + e.message);
             return null;
         }
     }
 
-    // --- 数据获取 & 图片流 (同 V10.1) ---
     async function fetchChapterData(userInput, isStart = false) {
-        const prompt = isStart ? "游戏开始。生成第一个随机的平行世界场景。" : `玩家选择了: "${userInput}"。继续剧情。`;
+        const prompt = isStart ? "游戏开始。生成第一个随机场景。" : `玩家选择了: "${userInput}"。继续剧情。`;
         try {
             const json = await callGemini(prompt);
             if (isStart) {
@@ -310,7 +276,7 @@
             
             const imgPromise = new Promise(resolve => {
                 const img = new Image();
-                const t = setTimeout(()=>resolve(imgUrl), 3000); // 超时兜底
+                const t = setTimeout(()=>resolve(imgUrl), 4000);
                 img.onload = () => { clearTimeout(t); resolve(imgUrl); };
                 img.onerror = () => { clearTimeout(t); resolve(imgUrl); };
                 img.src = imgUrl;
@@ -319,7 +285,6 @@
         } catch (e) { return null; }
     }
 
-    // --- 渲染逻辑 (针对手机优化滚动) ---
     function renderChapter(pkg, silent = false) {
         if(!pkg) return;
         const data = pkg.json;
@@ -372,7 +337,6 @@
                 document.getElementById('btn-a').innerText = `[A] ${currentData.choices[0].text}`;
                 document.getElementById('btn-b').innerText = `[B] ${currentData.choices[1].text}`;
                 document.getElementById('controls').classList.add('active');
-                // 自动滚动到底部
                 const scrollBox = document.getElementById('content-scroll');
                 scrollBox.scrollTop = scrollBox.scrollHeight;
             });
@@ -401,14 +365,13 @@
         });
     }
 
-    // --- 工具与特效 ---
     function typeWriter(el, txt, cb) {
         let i = 0; el.innerHTML = "";
         const scrollBox = document.getElementById('content-scroll');
         function t() {
             if (i < txt.length) {
                 el.innerHTML += txt.charAt(i); i++;
-                scrollBox.scrollTop = scrollBox.scrollHeight; // 自动跟随滚动
+                scrollBox.scrollTop = scrollBox.scrollHeight; 
                 setTimeout(t, 10);
             } else if (cb) cb();
         } t();
@@ -421,14 +384,45 @@
 
     function initParticles() {
         const container = document.getElementById('canvas-container');
+        if (!container) return;
         const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000000, 0.001);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
         camera.position.z = 100;
         const renderer = new THREE.WebGLRenderer({ alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        container.innerHTML = ''; // Clear
         container.appendChild(renderer.domElement);
         const geometry = new THREE.BufferGeometry();
         const vertices = [], colors = [];
         const colorPalette = [new THREE.Color(0x00f3ff), new THREE.Color(0xbc13fe), new THREE.Color(0xff0055)];
         for (let i = 0; i < 1500; i++) {
-            vertic
+            vertices.push((Math.random()-0.5)*400, (Math.random()-0.5)*400, (Math.random()-0.5)*400);
+            const c = colorPalette[Math.floor(Math.random()*3)];
+            colors.push(c.r, c.g, c.b);
+        }
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        const mat = new THREE.PointsMaterial({ size: 2, vertexColors: true, opacity: 0.7, transparent: true });
+        const particles = new THREE.Points(geometry, mat); scene.add(particles);
+        const animate = () => { requestAnimationFrame(animate); particles.rotation.x += 0.0005; renderer.render(scene, camera); };
+        animate();
+    }
+
+    async function playIntroSequence() {
+        const txt = document.getElementById('intro-content');
+        const door = document.getElementById('the-door');
+        document.getElementById('intro-layer').style.display = 'flex';
+        const lines = ["正在初始化...", "接入多元宇宙...", "同步率 100%"];
+        for (let line of lines) {
+            txt.innerText = line; txt.style.opacity = 1;
+            await new Promise(r => setTimeout(r, 1200));
+            txt.style.opacity = 0;
+            await new Promise(r => setTimeout(r, 300));
+        }
+        txt.style.display = 'none'; door.style.opacity = 1;
+        door.classList.add('zoom-effect');
+        await new Promise(r => setTimeout(r, 2000));
+    }
+</script>
+</body>
+</html>
