@@ -412,7 +412,11 @@
         const txt = document.getElementById('intro-content');
         const door = document.getElementById('the-door');
         document.getElementById('intro-layer').style.display = 'flex';
-        const lines = ["正在初始化...", "接入多元宇宙...", "同步率 100%"];
+        const lines = [
+            "正在初始化神经链路...", "已接入多元宇宙枢纽 (Multiverse Nexus)",
+            "这里是所有现实的交汇点...", "每一扇门，都是一个截然不同的世界。",
+            "正在为你随机锁定一个时空坐标...", "坐标已确认。准备传送。", "祝你好运，行者。"
+        ];
         for (let line of lines) {
             txt.innerText = line; txt.style.opacity = 1;
             await new Promise(r => setTimeout(r, 1200));
@@ -426,3 +430,4 @@
 </script>
 </body>
 </html>
+
