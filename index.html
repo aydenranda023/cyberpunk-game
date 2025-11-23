@@ -180,12 +180,32 @@
         });
     }
 
-    // 4. First Start (Trigger Generation)
-    function firstStart() {
-        // 房主点击开始，其实就是模拟一次名为 "START_GAME" 的投票
-        // 这会触发后端生成第一章，并写入 Firebase
-        makeChoice("START_GAME");
-        enterGameMode();
+// 4. First Start (Trigger Initial Scene)
+    async function firstStart() {
+        const btn = document.querySelector('button[onclick="firstStart()"]');
+        btn.innerText = "启动中...";
+        btn.disabled = true;
+
+        try {
+            // 调用新的特权接口
+            await fetch('/api/game', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    action: 'START_GAME', // 这里的动作改了
+                    roomId: currentRoomId, 
+                    userId: user.uid 
+                })
+            });
+            
+            // 房主不需要手动切换界面，因为他也在监听数据库
+            // 一旦后端写入了 current_scene，enterGameMode 里的监听器会自动触发渲染
+            
+        } catch(e) {
+            alert("启动失败: " + e.message);
+            btn.disabled = false;
+            btn.innerText = "启动同步 (START)";
+        }
     }
 
     // 5. Game Mode (Listener)
@@ -286,3 +306,4 @@
 </script>
 </body>
 </html>
+
