@@ -1,123 +1,123 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import admin from 'firebase-admin';
 
-// 1. 初始化 Firebase Admin (带私钥格式清洗)
+// --- 初始化 (保持不变) ---
 if (!admin.apps.length) {
-  try {
-    // 尝试获取环境变量
-    const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    const dbUrl = process.env.FIREBASE_DB_URL;
-
-    if (!serviceAccountRaw || !dbUrl) {
-      throw new Error("环境变量缺失: 请检查 FIREBASE_SERVICE_ACCOUNT 和 FIREBASE_DB_URL");
-    }
-
-    // --- 关键修复：处理私钥中的换行符 ---
-    const serviceAccount = JSON.parse(serviceAccountRaw);
-    if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    // ----------------------------------
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: dbUrl
-    });
-    console.log("Firebase Admin 初始化成功");
-
-  } catch (e) {
-    console.error("Firebase 初始化严重错误:", e);
-    // 这里不抛出错误，让 handler 里的 try-catch 捕获并返回给前端
-  }
+    try {
+        const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+        const dbUrl = process.env.FIREBASE_DB_URL;
+        if (serviceAccountStr && dbUrl) {
+            let serviceAccount = JSON.parse(serviceAccountStr);
+            if (serviceAccount.private_key) {
+                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            }
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                databaseURL: dbUrl
+            });
+        }
+    } catch (e) { console.error("Firebase Init Error", e); }
 }
 
-const db = admin.database();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
-  // 检查 Firebase 是否活著
-  if (!admin.apps.length) {
-    return res.status(500).json({ error: "Server Config Error: Firebase 连接失败，请查看 Vercel Logs" });
-  }
+    if (!admin.apps.length) return res.status(500).json({ error: "Database Connection Failed" });
+    
+    const db = admin.database();
+    const { action, roomId, userId, choiceText } = req.body;
 
-  const { action, roomId, userId, choiceText } = req.body;
+    try {
+        // 1. 创建房间
+        if (action === 'CREATE_ROOM') {
+            const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
+            await db.ref('rooms/' + newRoomId).set({
+                created_at: admin.database.ServerValue.TIMESTAMP,
+                status: 'WAITING',
+                players: {}
+            });
+            return res.status(200).json({ roomId: newRoomId });
+        }
 
-  try {
-    if (action === 'CREATE_ROOM') {
-      const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
-      await db.ref('rooms/' + newRoomId).set({
-        created_at: admin.database.ServerValue.TIMESTAMP,
-        status: 'WAITING',
-        turn: 0,
-        history: [],
-        players: {}
-      });
-      return res.status(200).json({ roomId: newRoomId });
+        // 2. 加入房间
+        if (action === 'JOIN_ROOM') {
+            const roomRef = db.ref('rooms/' + roomId);
+            const snapshot = await roomRef.once('value');
+            if (!snapshot.exists()) return res.status(404).json({ error: "Room not found" });
+            await roomRef.child('players/' + userId).update({ joined: true, choice: null });
+            return res.status(200).json({ success: true });
+        }
+
+        // 3. ★★★ 新增：强制开始游戏 (特权通道) ★★★
+        if (action === 'START_GAME') {
+            const roomRef = db.ref('rooms/' + roomId);
+            
+            // 直接调用 AI 生成第一章，不检查投票
+            const prompt = "GAME START. Generate the first scene of a cyberpunk story.";
+            const aiJson = await generateStory(prompt);
+
+            // 写入数据库
+            await roomRef.child('current_scene').set(aiJson);
+            await roomRef.update({ status: 'PLAYING' });
+            
+            // 记录历史
+            await roomRef.child('history').set([`[开场] ${aiJson.stage_1_env}`]);
+
+            return res.status(200).json({ status: "STARTED" });
+        }
+
+        // 4. 玩家常规行动 (投票检查)
+        if (action === 'MAKE_MOVE') {
+            const roomRef = db.ref('rooms/' + roomId);
+            await roomRef.child(`players/${userId}`).update({ choice: choiceText });
+            
+            const snapshot = await roomRef.once('value');
+            const players = snapshot.val().players || {};
+            const allReady = Object.values(players).every(p => p.choice);
+
+            if (!allReady) return res.status(200).json({ status: "WAITING" });
+
+            // 所有人就位，生成下一章
+            const historySnap = await roomRef.child('history').once('value');
+            const historyList = historySnap.val() || [];
+            
+            // 汇总动作
+            let summary = "";
+            Object.keys(players).forEach(pid => {
+                summary += `Player(${pid.slice(0,4)}) chose: ${players[pid].choice}; `;
+            });
+
+            const prompt = `[History]: ${historyList.slice(-3).join("\n")}\n[Actions]: ${summary}\nContinue story.`;
+            const aiJson = await generateStory(prompt);
+
+            await roomRef.child('current_scene').set(aiJson);
+            await roomRef.child('history').push(`[事件] ${aiJson.stage_2_event}`);
+            
+            // 清空投票
+            const updates = {};
+            Object.keys(players).forEach(pid => updates[`players/${pid}/choice`] = null);
+            await roomRef.update(updates);
+
+            return res.status(200).json({ status: "NEW_TURN" });
+        }
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: error.message });
     }
+}
 
-    if (action === 'JOIN_ROOM') {
-      const roomRef = db.ref('rooms/' + roomId);
-      const snapshot = await roomRef.once('value');
-      if (!snapshot.exists()) return res.status(404).json({ error: "房间不存在" });
-      
-      await roomRef.child('players/' + userId).update({
-        joined: true,
-        status: 'READY',
-        choice: null
-      });
-      return res.status(200).json({ success: true });
-    }
-
-    if (action === 'MAKE_MOVE') {
-      const roomRef = db.ref('rooms/' + roomId);
-      await roomRef.child(`players/${userId}`).update({ choice: choiceText });
-
-      const snapshot = await roomRef.once('value');
-      const roomData = snapshot.val();
-      const players = roomData.players || {};
-      const playerIds = Object.keys(players);
-      
-      const allReady = playerIds.length > 0 && playerIds.every(pid => players[pid].choice);
-
-      if (!allReady) {
-        return res.status(200).json({ status: 'WAITING_OTHERS' });
-      }
-
-      // 结算逻辑
-      let actionsSummary = "";
-      playerIds.forEach(pid => {
-        actionsSummary += `玩家(${pid})选择了: ${players[pid].choice}; `;
-      });
-
-      const historyText = (roomData.history || []).slice(-3).join("\n");
-      const prompt = `
-        [历史剧情]: ${historyText}
-        [玩家行动]: ${actionsSummary}
-        请继续生成剧情。JSON格式: { "stage_1_env": "...", "stage_2_event": "...", "stage_3_analysis": "...", "image_keyword": "...", "choices": [{"text":"A"}, {"text":"B"}] }
-      `;
-
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text().replace(/```json|```/g, "").trim();
-      const aiJson = JSON.parse(responseText);
-
-      await roomRef.child('current_scene').set(aiJson);
-      
-      let newHistoryList = roomData.history || [];
-      newHistoryList.push(`[事件]${aiJson.stage_2_event}`);
-      await roomRef.child('history').set(newHistoryList);
-
-      const resetUpdates = {};
-      playerIds.forEach(pid => resetUpdates[`players/${pid}/choice`] = null);
-      await roomRef.update(resetUpdates);
-
-      return res.status(200).json({ status: 'NEW_TURN_GENERATED' });
-    }
-
-    return res.status(400).json({ error: "Unknown Action" });
-
-  } catch (error) {
-    console.error("API 处理错误:", error);
-    res.status(500).json({ error: error.message });
-  }
+// 辅助函数：调用 AI
+async function generateStory(prompt) {
+    const sysPrompt = `
+    ROLE: Cyberpunk Game Master. 
+    LANG: Chinese (Simplified). 
+    FORMAT: JSON ONLY.
+    Structure: { "image_keyword": "noun", "stage_1_env": "100 words", "stage_2_event": "80 words", "stage_3_analysis": "50 words", "choices": [{"text":"A"},{"text":"B"}] }
+    `;
+    
+    const result = await model.generateContent(sysPrompt + "\n" + prompt);
+    const txt = result.response.text().replace(/```json|```/g, "").trim();
+    return JSON.parse(txt);
 }
