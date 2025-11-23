@@ -105,16 +105,39 @@
         } catch(e) { alert("Config Error"); }
     }
 
-    // 2. Create Room (API)
+// 2. Create Room (API)
     async function createRoom() {
-        const res = await fetch('/api/game', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'CREATE_ROOM' })
-        });
-        const data = await res.json();
-        currentRoomId = data.roomId;
-        enterWaitingRoom();
+        // 给按钮加个反馈，防止以为没点上
+        const btn = document.querySelector('button[onclick="createRoom()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "连接云端中...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/game', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'CREATE_ROOM' })
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                // 如果后端报错，抛出错误信息
+                throw new Error(data.error || "服务器未知错误");
+            }
+
+            currentRoomId = data.roomId;
+            enterWaitingRoom();
+
+        } catch (e) {
+            alert("创建位面失败:\n" + e.message);
+            console.error(e);
+        } finally {
+            // 恢复按钮
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     }
 
     // 3. Join Room (API)
@@ -230,3 +253,4 @@
 </script>
 </body>
 </html>
+
