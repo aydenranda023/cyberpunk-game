@@ -183,28 +183,28 @@
 // 4. First Start (Trigger Initial Scene)
     async function firstStart() {
         const btn = document.querySelector('button[onclick="firstStart()"]');
-        btn.innerText = "启动中...";
+        btn.innerText = "正在初始化神经连接...";
         btn.disabled = true;
 
         try {
-            // 调用新的特权接口
+            // ★★★ 核心修复：先进入游戏模式，开始监听数据库 ★★★
+            enterGameMode(); 
+
+            // 然后再发送请求让 AI 生成
             await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ 
-                    action: 'START_GAME', // 这里的动作改了
+                    action: 'START_GAME', 
                     roomId: currentRoomId, 
                     userId: user.uid 
                 })
             });
             
-            // 房主不需要手动切换界面，因为他也在监听数据库
-            // 一旦后端写入了 current_scene，enterGameMode 里的监听器会自动触发渲染
-            
         } catch(e) {
-            alert("启动失败: " + e.message);
-            btn.disabled = false;
-            btn.innerText = "启动同步 (START)";
+            alert("启动指令发送失败: " + e.message);
+            // 如果失败了，可能需要刷新页面重来
+            location.reload();
         }
     }
 
@@ -306,4 +306,5 @@
 </script>
 </body>
 </html>
+
 
