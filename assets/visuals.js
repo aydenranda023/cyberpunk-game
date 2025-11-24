@@ -1,4 +1,3 @@
-// Three.js & Intro 动画逻辑
 window.initParticles = function(){
     const c=document.getElementById('canvas-container');if(!c)return;
     const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);
