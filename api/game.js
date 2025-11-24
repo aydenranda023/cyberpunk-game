@@ -22,7 +22,6 @@ export default async function handler(req, res) {
     const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
-        // 1. 创建
         if (action === 'CREATE_ROOM') {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
             await db.ref('rooms/' + newRoomId).set({
@@ -33,7 +32,6 @@ export default async function handler(req, res) {
             return res.status(200).json({ roomId: newRoomId });
         }
 
-        // 2. 加入
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
@@ -42,13 +40,10 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true });
         }
 
-        // 3. 生成剧情 (核心)
         if (action === 'START_GAME' || action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             
-            if (action === 'MAKE_MOVE') {
-                await roomRef.child(`players/${userId}`).update({ choice: choiceText });
-            }
+            if (action === 'MAKE_MOVE') await roomRef.child(`players/${userId}`).update({ choice: choiceText });
 
             const snapshot = await roomRef.once('value');
             const roomData = snapshot.val();
@@ -60,7 +55,6 @@ export default async function handler(req, res) {
                 if (!allReady) return res.status(200).json({ status: "WAITING" });
             }
 
-            // 准备 Prompt
             const historySnap = await roomRef.child('history').once('value');
             let historyList = historySnap.val() || [];
             if (typeof historyList === 'object') historyList = Object.values(historyList);
@@ -68,60 +62,63 @@ export default async function handler(req, res) {
             let playerContext = "";
             playerIds.forEach((pid, idx) => {
                 const p = players[pid];
-                const choice = p.choice || "进入游戏";
-                const role = p.profile?.role || "未知";
-                const name = p.profile?.name || "V";
-                // 关键：明确告诉 AI 玩家的顺序索引
-                playerContext += `Player_Index_${idx} (Real_ID: ${pid}): [${role}] ${name}. Action: ${choice}\n`;
+                playerContext += `Index_${idx}: ${p.profile?.name}(${p.profile?.role}) Action:${p.choice || "Start"}\n`;
             });
 
+            // --- Prompt 简化与强化 ---
             const sysPrompt = `
-            你是一个赛博朋克文字游戏主持人。
+            ROLE: Cyberpunk GM. LANG: Chinese (Simplified).
             
-            【绝对规则】
-            1. **必须使用中文 (简体)**。
-            2. 必须返回一个包含所有玩家视角的数组 (Array)。数组顺序必须与输入的 Player_Index 严格对应。
-            
-            【输入信息】
-            [历史]: ${historyList.slice(-3).join("\n")}
-            [玩家列表]:
-            ${playerContext}
+            INPUT:
+            [History]: ${historyList.slice(-3).join("\n")}
+            [Players]: ${playerContext}
 
-            【输出格式 JSON】
+            OUTPUT JSON FORMAT (Strict Array):
             {
-                "global_summary": "一句话概括(中文)",
+                "global_summary": "summary string",
                 "views_array": [
                     {
-                        "image_keyword": "english noun",
-                        "stage_1_env": "环境描写(中文)",
-                        "stage_2_event": "突发事件(中文)",
-                        "stage_3_analysis": "分析(中文)",
-                        "choices": [{"text":"A中文"},{"text":"B中文"}]
-                    },
-                    { ...下一个玩家的视角... }
+                        "image_keyword": "english_noun",
+                        "txt_1": "Environment Description (100 words)",
+                        "txt_2": "Event Description (80 words)",
+                        "txt_3": "Analysis (50 words)",
+                        "choices": [{"text":"A"},{"text":"B"}]
+                    }
                 ]
             }
+            IMPORTANT: "views_array" must have an object for EACH player index.
             `;
 
             const result = await model.generateContent(sysPrompt);
             const txt = result.response.text().replace(/```json|```/g, "").trim();
             const aiJson = JSON.parse(txt);
 
-            // --- 数组映射回 UID ---
+            // --- ★★★ 数据清洗与映射 (The Sanitizer) ★★★ ---
             const finalSceneData = {};
-            // 确保 views_array 存在且长度匹配
-            const views = aiJson.views_array || [];
-            
+            const rawViews = aiJson.views_array || aiJson.views || [];
+            const viewList = Array.isArray(rawViews) ? rawViews : Object.values(rawViews);
+
             playerIds.forEach((realPid, index) => {
-                // 如果 AI 生成的数组不够长，就复用第一个，防止报错
-                const view = views[index] || views[0];
-                if (view) {
-                    finalSceneData[realPid] = view;
-                }
+                // 获取原始数据
+                let rawView = viewList[index] || viewList[0] || {};
+                
+                // 强制标准化键名 (防止 AI 瞎写 Key)
+                // 无论 AI 返回 stage_1_env, txt_1, 还是 environment，都映射到标准 Key
+                const cleanView = {
+                    image_keyword: rawView.image_keyword || rawView.keyword || "cyberpunk",
+                    // 尝试所有可能的键名
+                    stage_1_env: rawView.txt_1 || rawView.stage_1_env || rawView.env || "数据流干扰...无法解析环境数据。",
+                    stage_2_event: rawView.txt_2 || rawView.stage_2_event || rawView.event || "...",
+                    stage_3_analysis: rawView.txt_3 || rawView.stage_3_analysis || rawView.analysis || "...",
+                    choices: rawView.choices || [{"text":"继续"},{"text":"观察"}]
+                };
+
+                finalSceneData[realPid] = cleanView;
             });
+            // -------------------------------------------------
 
             await roomRef.child('current_scene').set(finalSceneData);
-            await roomRef.child('history').push(`[事件] ${aiJson.global_summary}`);
+            await roomRef.child('history').push(`[Event] ${aiJson.global_summary || "未知事件"}`);
             
             const updates = {};
             playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
