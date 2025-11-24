@@ -5,26 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NEURAL_LINK // V18.0_MODULAR</title>
     
-    <!-- Libraries -->
+    <!-- 1. 引入外部库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     
-    <!-- Styles -->
+    <!-- 2. 引入样式文件 (面子) -->
+    <!-- 确保你建立了 assets 文件夹并在里面放了 style.css -->
     <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 
+<!-- 背景层 -->
 <div id="canvas-container"></div>
 <div class="vignette"></div>
 <div class="scanlines"></div>
 
-<!-- ... (HTML 结构与之前完全一致，只是去掉了 <style> 和 <script>) ... -->
-<!-- 为了方便，这里我需要把所有 HTML DOM 元素再放一遍吗？还是你自己把原来的 <body> 内容留着？-->
-<!-- 建议保留你原来 index.html 的 body 内部结构，只把 script 换成下面的引用 -->
+<!-- 弹窗与大厅 -->
+<div id="modal">
+    <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:2.5rem; margin-bottom:10px">NEURAL LINK</h1>
+    
+    <!-- 配置 -->
+    <div id="step-config">
+        <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:60px"></textarea>
+        <button class="cyber-btn" onclick="initApp()">初始化 (INIT)</button>
+    </div>
 
-<!-- Scripts -->
+    <!-- 大厅 -->
+    <div id="step-lobby" class="hidden" style="width:100%; max-width:400px; text-align:center">
+        <div class="id-card">
+            <div class="id-row"><span class="id-val" id="card-name">...</span> <span class="id-val" id="card-role" style="color:var(--neon-yellow)">...</span></div>
+            <div class="id-row" style="border-top:1px dashed #444; margin-top:5px; padding-top:5px">
+                <span style="color:#888">绝密:</span> <span id="card-secret" style="color:var(--neon-pink)">...</span>
+            </div>
+        </div>
+        <div id="room-list-container"></div>
+        <button class="cyber-btn" onclick="createSoloGame()">开启单人位面</button>
+        <div style="display:flex; gap:10px">
+            <input id="room-input" placeholder="位面ID" style="margin:0">
+            <button class="cyber-btn" style="width:auto; margin:0" onclick="joinGame()">加入</button>
+        </div>
+        <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">[重置身份]</div>
+    </div>
+    
+    <!-- 等待区 -->
+    <div id="step-waiting" class="hidden" style="text-align:center">
+        <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
+        <p style="color:#888">等待接入...</p>
+        <div id="player-count" style="color:var(--neon-cyan); margin:20px">连接数: 1</div>
+        <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
+    </div>
+</div>
+
+<!-- 开场动画 -->
+<div id="intro-layer" class="hidden">
+    <div id="intro-content" class="intro-text"></div>
+    <div id="the-door" class="door-frame"></div>
+</div>
+
+<!-- 游戏主终端 -->
+<div id="terminal">
+    <div id="hud-bar">
+        <div class="hud-group">
+            <span class="hud-item">代号:</span> <span class="hud-val" id="hud-name-disp">V</span>
+            <span class="hud-item" style="margin-left:10px">HP:</span> <span class="hud-val" id="hud-hp-disp">100</span>
+        </div>
+        <div class="hud-group">
+            <span class="hud-val secret" id="hud-item-disp">...</span>
+        </div>
+    </div>
+
+    <div id="visual-container">
+        <img id="scene-img" src="">
+        <div class="overlay-ui"><span>FEED: <span id="loading-hint">STANDBY</span></span></div>
+    </div>
+    
+    <div id="content-scroll"><div id="story-box"></div></div>
+    
+    <div id="controls-area">
+        <div id="wait-overlay" class="hidden"><p>等待决策同步...</p></div>
+        <div id="next-trigger" onclick="advanceFragment()">▼ 点击继续剧情 ▼</div>
+        <div id="controls">
+            <button id="btn-a" class="cyber-btn" onclick="makeChoice('A')">A</button>
+            <button id="btn-b" class="cyber-btn" onclick="makeChoice('B')">B</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. 引入逻辑文件 (里子) -->
+<!-- 确保你建立了 assets 文件夹并放了下面两个 JS 文件 -->
 <script src="assets/visuals.js"></script>
 <script src="assets/main.js"></script>
 
