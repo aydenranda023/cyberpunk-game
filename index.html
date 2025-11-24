@@ -3,71 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // V17.4</title>
+    <title>NEURAL_LINK // V18.0</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap');
-        
-        :root { 
-            --bg-color: #050505; --neon-cyan: #00f3ff; --neon-pink: #ff0055; --neon-yellow: #fcee0a; 
-            --font-title: 'ZCOOL QingKe HuangYou', cursive; --font-body: 'Noto Sans SC', sans-serif; 
-        }
-
-        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; background: var(--bg-color); color: #eee; font-family: var(--font-body); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
-        .vignette { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle, transparent 40%, #000 100%); pointer-events: none; }
-        .scanlines { position: fixed; inset: 0; z-index: 2; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; }
-        .hidden { display: none !important; }
-
-        .cyber-btn { background: rgba(0, 20, 40, 0.9); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 12px; font-family: var(--font-title); font-size: 1.1rem; width: 100%; margin-bottom: 10px; cursor: pointer; text-transform: uppercase; }
-        .cyber-btn:active { background: var(--neon-cyan); color: #000; }
-        
-        #modal { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); padding: 20px; }
-        textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; margin-bottom: 10px; }
-        .id-card { border: 1px solid var(--neon-pink); padding: 15px; margin-bottom: 20px; background: rgba(20, 0, 10, 0.8); width: 100%; max-width: 300px; text-align: left; }
-        .id-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
-        .id-val { color: #fff; font-weight: bold; }
-
-        #room-list-container { width: 100%; max-width: 400px; height: 150px; overflow-y: auto; border: 1px solid #333; margin-bottom: 10px; background: rgba(0,0,0,0.5); }
-        .room-item { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; cursor: pointer; font-size: 0.9rem; }
-        
-        #terminal { position: absolute; inset: 0; z-index: 50; background: rgba(5,5,5,0.95); visibility: hidden; display: flex; flex-direction: column; }
-        header { padding: 8px 15px; border-bottom: 1px solid var(--neon-cyan); background: #111; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; }
-        
-        #visual-container { height: 30vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; flex-shrink: 0; }
-        #scene-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: 0.5s; }
-        .overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; font-size: 0.8rem; color: #fff; }
-
-        #content-scroll { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        
-        /* 文字显示框优化 */
-        .msg-block { 
-            padding-left: 12px; border-left: 3px solid #333; 
-            opacity: 0; transform: translateY(10px); transition: 0.5s; 
-            font-size: 1rem; line-height: 1.6; color: #ddd; 
-            min-height: 30px; /* 确保即使没字也占位 */
-        }
-        .msg-block.show { opacity: 1; transform: translateY(0); }
-        
-        #controls-area { padding: 15px; background: #111; border-top: 1px solid #333; position: relative; }
-        #next-trigger { text-align: center; padding: 15px; color: #888; cursor: pointer; border-bottom: 1px solid #333; margin-bottom: 10px; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-        
-        #controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; opacity: 0.3; pointer-events: none; transition: 0.3s; }
-        #controls.active { opacity: 1; pointer-events: all; }
-        #wait-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 20; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); font-family: var(--font-title); }
-        
-        #intro-layer { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.5rem; transition: 1s; }
-        .intro-text { font-size: 1.8rem; text-shadow: 0 0 10px var(--neon-cyan); margin-bottom: 30px; text-align: center; padding: 20px; opacity: 0; transition: 0.5s; }
-        .door-frame { position: absolute; width: 80px; height: 160px; border: 2px solid #fff; box-shadow: 0 0 50px #fff; opacity: 0; transition: 2s; }
-        .zoom-effect { animation: zoomIn 2.5s forwards ease-in; }
-        @keyframes zoomIn { 0% { transform: scale(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(60); opacity: 0; } }
-    </style>
+    
+    <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 
@@ -75,12 +18,15 @@
 <div class="vignette"></div>
 <div class="scanlines"></div>
 
+<!-- CONFIG & LOBBY -->
 <div id="modal">
     <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:2.5rem; margin-bottom:10px">NEURAL LINK</h1>
+    
     <div id="step-config">
         <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:60px"></textarea>
         <button class="cyber-btn" onclick="initApp()">初始化</button>
     </div>
+
     <div id="step-lobby" class="hidden" style="width:100%; max-width:400px; text-align:center">
         <div class="id-card">
             <div class="id-row"><span class="id-val" id="card-name">...</span> <span class="id-val" id="card-role" style="color:var(--neon-yellow)">...</span></div>
@@ -93,6 +39,7 @@
         </div>
         <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">[重置]</div>
     </div>
+    
     <div id="step-waiting" class="hidden" style="text-align:center">
         <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
         <p style="color:#888">等待接入...</p>
@@ -101,11 +48,13 @@
     </div>
 </div>
 
+<!-- INTRO -->
 <div id="intro-layer" class="hidden">
     <div id="intro-content" class="intro-text"></div>
     <div id="the-door" class="door-frame"></div>
 </div>
 
+<!-- GAME -->
 <div id="terminal">
     <header>
         <div>ROOM: <span id="hud-room">0000</span></div>
@@ -126,184 +75,8 @@
     </div>
 </div>
 
-<script>
-    let db, auth, user, myProfile = null;
-    let currentRoomId = null, currentData = null, currentStage = 0;
-    let preBuffer = { A: null, B: null };
+<script src="assets/visuals.js"></script>
+<script src="assets/main.js"></script>
 
-    function initApp() {
-        const cfgStr = document.getElementById('config-input').value.trim();
-        if(!cfgStr) return alert("Config Required");
-        try {
-            let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1) : cfgStr;
-            const config = new Function("return " + clean)();
-            firebase.initializeApp(config); auth = firebase.auth(); db = firebase.database();
-            auth.signInAnonymously().then(u => { user = u.user; loadCharacter(); initParticles(); });
-        } catch(e) { alert("配置错误"); }
-    }
-
-    function loadCharacter() {
-        db.ref('users/' + user.uid).once('value', s => {
-            const val = s.val();
-            if (val && val.profile) { myProfile = val.profile; renderLobby(); }
-            else { createNewCharacter(); }
-        });
-    }
-
-    function createNewCharacter() {
-        const roles = [{id:"Solo",label:"佣兵"},{id:"Netrunner",label:"黑客"},{id:"Doc",label:"医生"}];
-        const r = roles[Math.floor(Math.random()*roles.length)];
-        const name = ["V", "强尼", "杰克", "露西", "K"][Math.floor(Math.random()*5)] + "_" + Math.floor(Math.random()*99);
-        myProfile = { name: name, role: r.label, public: { hp: 100 }, private: { secret: "..." } };
-        db.ref('users/' + user.uid).set({ profile: myProfile });
-        renderLobby();
-    }
-
-    function renderLobby() {
-        document.getElementById('card-name').innerText = myProfile.name;
-        document.getElementById('card-role').innerText = myProfile.role;
-        document.getElementById('step-config').classList.add('hidden');
-        document.getElementById('step-lobby').classList.remove('hidden');
-        db.ref('rooms').limitToLast(10).on('value', s => {
-            const div = document.getElementById('room-list-container'); div.innerHTML = "";
-            const rooms = s.val(); if(!rooms) return;
-            Object.keys(rooms).reverse().forEach(rid => {
-                const r = rooms[rid]; if(!r.host_info) return;
-                const item = document.createElement('div'); item.className = 'room-item';
-                item.innerHTML = `<span>[${r.host_info.role}] ${r.host_info.name}</span> <span>接入 ></span>`;
-                item.onclick = () => joinGame(rid);
-                div.appendChild(item);
-            });
-        });
-    }
-
-    function deleteCharacter() { if(confirm("重置?")) db.ref('users/'+user.uid).remove().then(()=>location.reload()); }
-
-    async function createSoloGame() {
-        try {
-            const res = await fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile }) });
-            const data = await res.json();
-            currentRoomId = data.roomId;
-            await fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile }) });
-            enterWaiting();
-        } catch(e) { alert(e.message); }
-    }
-
-    async function joinGame(rid) {
-        const ridVal = rid || document.getElementById('room-input').value;
-        try {
-            const res = await fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile }) });
-            if(res.ok) { currentRoomId = ridVal; startTransition(); } else alert("无法加入");
-        } catch(e) { alert("ERR"); }
-    }
-
-    function enterWaiting() {
-        document.getElementById('step-lobby').classList.add('hidden');
-        document.getElementById('step-waiting').classList.remove('hidden');
-        document.getElementById('room-code-disp').innerText = currentRoomId;
-        db.ref(`rooms/${currentRoomId}/players`).on('value', s => { document.getElementById('player-count').innerText = `连接数: ${s.numChildren()}`; });
-    }
-
-    async function firstStart() {
-        startTransition();
-        fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'START_GAME', roomId: currentRoomId, userId: user.uid }) });
-    }
-
-    function startTransition() {
-        document.getElementById('modal').style.display = 'none';
-        playIntroSequence().then(() => {
-            const term = document.getElementById('terminal');
-            term.style.visibility = 'visible'; term.style.opacity = 1;
-            document.getElementById('hud-room').innerText = currentRoomId;
-            document.getElementById('hud-hp').innerText = myProfile.public.hp;
-
-            db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
-                const data = snapshot.val();
-                if(data) {
-                    // ★★★ 核心：容错获取数据 ★★★
-                    const myData = data[user.uid] || Object.values(data)[0];
-                    renderScene(myData);
-                }
-            });
-        });
-    }
-
-    function renderScene(data) {
-        document.getElementById('wait-overlay').classList.add('hidden');
-        currentData = data; currentStage = 0;
-        document.getElementById('story-box').innerHTML = "";
-        document.getElementById('controls').classList.remove('active');
-        document.getElementById('next-trigger').style.display = 'none';
-        
-        // Image
-        const rawKw = data.image_keyword || "cyberpunk";
-        const kw = rawKw.split(' ')[0].replace(/[^a-zA-Z0-9]/g,"");
-        const url = `https://loremflickr.com/640/360/cyberpunk,${kw}?random=${Date.now()}`;
-        const img = document.getElementById('scene-img'); img.style.opacity=0; img.src=url;
-        img.onload = () => { img.style.opacity=0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
-
-        // Text 1 (Start Flow)
-        const txt1 = data.stage_1_env || "[数据流干扰... 无法解析环境数据]";
-        addMsg(txt1, 'var(--neon-cyan)');
-        
-        setTimeout(() => { document.getElementById('next-trigger').style.display = 'block'; }, 1000);
-    }
-
-    window.advanceFragment = function() {
-        document.getElementById('next-trigger').style.display = 'none';
-        if (currentStage === 0) {
-            currentStage = 1;
-            const txt2 = currentData.stage_2_event || ".......";
-            addMsg(txt2, 'var(--neon-pink)');
-            setTimeout(() => document.getElementById('next-trigger').style.display = 'block', 1000);
-        } else if (currentStage === 1) {
-            currentStage = 2;
-            const txt3 = currentData.stage_3_analysis || ".......";
-            addMsg(txt3, 'var(--neon-yellow)');
-            
-            const tA = currentData.choices?.[0]?.text || "选项A";
-            const tB = currentData.choices?.[1]?.text || "选项B";
-            document.getElementById('btn-a').innerText = `[A] ${tA}`;
-            document.getElementById('btn-b').innerText = `[B] ${tB}`;
-            document.getElementById('controls').classList.add('active');
-        }
-    }
-
-    async function makeChoice(text) {
-        document.getElementById('wait-overlay').classList.remove('hidden');
-        const choiceText = (text === 'A') ? currentData.choices[0].text : currentData.choices[1].text;
-        try {
-            await fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText }) });
-        } catch(e) { document.getElementById('wait-overlay').classList.add('hidden'); }
-    }
-
-    function addMsg(txt, color) {
-        const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
-        document.getElementById('story-box').appendChild(d); setTimeout(()=>d.classList.add('show'), 50);
-        const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
-    }
-
-    async function playIntroSequence() {
-        const layer = document.getElementById('intro-layer');
-        const txt = document.getElementById('intro-content');
-        const door = document.getElementById('the-door');
-        layer.classList.remove('hidden'); layer.style.display = 'flex';
-        
-        const lines = ["神经链路校准...", "接入多元宇宙...", "准备传送..."];
-        for (let line of lines) {
-            txt.innerText = line; txt.style.opacity = 1; txt.style.transform = "scale(1)";
-            await new Promise(r => setTimeout(r, 1500)); 
-            txt.style.opacity = 0; txt.style.transform = "scale(0.9)";
-            await new Promise(r => setTimeout(r, 500));
-        }
-        
-        txt.style.display='none'; door.style.opacity=1; door.classList.add('zoom-effect');
-        await new Promise(r => setTimeout(r, 2000));
-        layer.style.opacity = 0; setTimeout(() => layer.classList.add('hidden'), 1000);
-        return true;
-    }
-
-    function initParticles(){const c=document.getElementById('canvas-container');if(!c)return;const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);const cam=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,1,1000);cam.position.z=100;const r=new THREE.WebGLRenderer({alpha:true});r.setSize(window.innerWidth,window.innerHeight);c.innerHTML='';c.appendChild(r.domElement);const g=new THREE.BufferGeometry();const v=[],cl=[];for(let i=0;i<1500;i++){v.push((Math.random()-0.5)*400,(Math.random()-0.5)*400,(Math.random()-0.5)*400);const c=[0x00f3ff,0xbc13fe,0xff0055][Math.floor(Math.random()*3)];const hc=new THREE.Color(c);cl.push(hc.r,hc.g,hc.b);}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));const m=new THREE.PointsMaterial({size:2,vertexColors:true,opacity:0.7,transparent:true});const p=new THREE.Points(g,m);s.add(p);const a=()=>{requestAnimationFrame(a);p.rotation.x+=0.0005;r.render(s,cam);};a();window.addEventListener('resize',()=>{cam.aspect=window.innerWidth/window.innerHeight;cam.updateProjectionMatrix();r.setSize(window.innerWidth,window.innerHeight);});}
-</script>
 </body>
 </html>
