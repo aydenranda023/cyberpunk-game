@@ -22,35 +22,34 @@ export default async function handler(req, res) {
     const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
-        // 创建 & 加入 (保持不变)
+        // 1. 创建房间
         if (action === 'CREATE_ROOM') {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
             await db.ref('rooms/' + newRoomId).set({
                 created_at: admin.database.ServerValue.TIMESTAMP,
                 status: 'SOLO', turn: 0, players: {},
-                host_info: userProfile || { name: 'Unknown', role: 'Ghost' }
+                host_info: userProfile || { name: '未知', role: 'Ghost' }
             });
             return res.status(200).json({ roomId: newRoomId });
         }
 
+        // 2. 加入房间
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
-            if (!snapshot.exists()) return res.status(404).json({ error: "Room not found" });
+            if (!snapshot.exists()) return res.status(404).json({ error: "房间不存在" });
             await roomRef.child('players/' + userId).update({ joined: true, choice: null, profile: userProfile });
             return res.status(200).json({ success: true });
         }
 
-        // --- 核心修改：生成逻辑 ---
+        // 3. 生成剧情 (START 或 MAKE_MOVE)
         if (action === 'START_GAME' || action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             
-            // 如果是玩家行动，先记录
             if (action === 'MAKE_MOVE') {
                 await roomRef.child(`players/${userId}`).update({ choice: choiceText });
             }
 
-            // 获取房间所有数据
             const snapshot = await roomRef.once('value');
             const roomData = snapshot.val();
             const players = roomData.players || {};
@@ -62,59 +61,59 @@ export default async function handler(req, res) {
                 if (!allReady) return res.status(200).json({ status: "WAITING" });
             }
 
-            // --- 构建“罗生门” Prompt ---
+            // --- 准备 Prompt 数据 ---
             const historySnap = await roomRef.child('history').once('value');
             let historyList = historySnap.val() || [];
             if (typeof historyList === 'object') historyList = Object.values(historyList);
-            const historyText = historyList.slice(-3).join("\n");
-
-            // 描述每个玩家及其行动
-            let playerContext = "";
+            
+            let context = "";
             playerIds.forEach(pid => {
                 const p = players[pid];
-                const choice = p.choice || "GAME_START";
-                playerContext += `Player ID "${pid}": Role=${p.profile.role}, Name=${p.profile.name}, Action=${choice}.\n`;
+                const choice = p.choice || "进入游戏";
+                // 把玩家的表/里设定传给 AI
+                const publicInfo = JSON.stringify(p.profile?.public || {});
+                const privateInfo = JSON.stringify(p.profile?.private || {});
+                context += `玩家ID(${pid}): 角色[${p.profile?.name}], 职业[${p.profile?.role}]。\n【公开状态】:${publicInfo}\n【秘密状态】:${privateInfo}\n【本轮行动】:${choice}\n\n`;
             });
 
-            const prompt = `
-            [History]: ${historyText}
-            [Players & Actions]:
-            ${playerContext}
-
-            GENERATE NEXT SCENE.
+            const sysPrompt = `
+            你是一个赛博朋克文字游戏的主持人 (Game Master)。
             
-            【CRITICAL REQUIREMENT】: You must generate a SEPARATE JSON object for EACH player ID listed above.
-            Each player sees the story from their own 2nd person perspective ("You...").
-            Their choices must be relevant to their own role and situation.
+            【绝对规则】
+            1. **必须使用中文 (简体) 输出**。严禁使用英文描述剧情。
+            2. 这是一个多视角游戏。你需要为每个玩家分别生成一段属于他视角的剧情（第二人称“你”）。
+            3. 剧情要黑暗、紧张、高科技低生活。
+            
+            【输入信息】
+            [历史剧情]: ${historyList.slice(-3).join("\n")}
+            [当前玩家状态与行动]:
+            ${context}
 
-            OUTPUT JSON FORMAT:
+            【输出要求 JSON】
+            请返回一个 JSON 对象，不要包含 Markdown 标记。
+            结构如下：
             {
-                "global_event_summary": "One sentence summary of what happened (for history)",
+                "global_summary": "一句话概括发生了什么（存入历史）",
                 "views": {
-                    "PLAYER_ID_GOES_HERE": {
-                        "image_keyword": "noun",
-                        "stage_1_env": "...",
-                        "stage_2_event": "...",
-                        "stage_3_analysis": "...",
-                        "choices": [{"text":"A"},{"text":"B"}]
+                    "玩家ID_1": {
+                        "image_keyword": "提取一个具体的英文名词(noun)用于生成图片",
+                        "stage_1_env": "环境描写(中文, 80字)",
+                        "stage_2_event": "突发事件/遭遇(中文, 80字)",
+                        "stage_3_analysis": "危机分析/心理活动(中文, 50字)",
+                        "choices": [{"text":"选项A(中文)"},{"text":"选项B(中文)"}]
                     },
-                    "ANOTHER_PLAYER_ID": { ... }
+                    "玩家ID_2": { ...同上... }
                 }
             }
             `;
 
-            const aiRes = await model.generateContent(prompt);
-            const txt = aiRes.response.text().replace(/```json|```/g, "").trim();
+            const result = await model.generateContent(sysPrompt);
+            const txt = result.response.text().replace(/```json|```/g, "").trim();
             const aiJson = JSON.parse(txt);
 
-            // 写入数据库
-            // 注意：现在 current_scene 是一个包含多个 uid key 的对象
             await roomRef.child('current_scene').set(aiJson.views);
+            await roomRef.child('history').push(`[事件] ${aiJson.global_summary}`);
             
-            // 记录历史 (用 AI 生成的全局总结)
-            await roomRef.child('history').push(`[Event] ${aiJson.global_event_summary}`);
-            
-            // 清空投票
             const updates = {};
             playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
             await roomRef.update(updates);
