@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import admin from 'firebase-admin';
 
-// --- 初始化 (保持不变) ---
+// --- 初始化 (防炸逻辑) ---
 if (!admin.apps.length) {
     try {
         const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -24,61 +24,65 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
     if (!admin.apps.length) return res.status(500).json({ error: "Database Connection Failed" });
-    const db = admin.database();
     
-    // 注意：增加了 userProfile 参数
+    const db = admin.database();
+    // 注意：这里解构出了 userProfile
     const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
-        // --- 1. 创建房间 (改为单人模式启动) ---
+        // --- 1. 创建房间 (带房主档案) ---
         if (action === 'CREATE_ROOM') {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
             
             await db.ref('rooms/' + newRoomId).set({
                 created_at: admin.database.ServerValue.TIMESTAMP,
-                status: 'SOLO', // 默认为单人模式，等待别人加入
+                status: 'SOLO', 
                 turn: 0,
-                players: {}, // 稍后通过 JOIN 填入
-                host_info: userProfile // 把房主信息存在这里，供大厅列表展示
+                players: {},
+                // 关键：把房主信息存这就行，稍后 JOIN 会存更详细的
+                host_info: userProfile || { name: 'Unknown', role: 'Ghost' }
             });
             
             return res.status(200).json({ roomId: newRoomId });
         }
 
-        // --- 2. 加入房间 (带上身份) ---
+        // --- 2. 加入房间 (带玩家档案) ---
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
-            if (!snapshot.exists()) return res.status(404).json({ error: "位面信号已消失" });
+            if (!snapshot.exists()) return res.status(404).json({ error: "房间不存在" });
             
-            // 将玩家档案写入房间的 players 列表
+            // 关键：把前端发来的 userProfile 存入数据库
             await roomRef.child('players/' + userId).update({
                 joined: true,
+                status: 'READY',
                 choice: null,
-                profile: userProfile // 记录身份
+                profile: userProfile // <--- 这里存入了你的黑匣子数据
             });
             
             return res.status(200).json({ success: true });
         }
 
-        // --- 3. 开始游戏 (单人开场) ---
+        // --- 3. 开始游戏 (第一章) ---
         if (action === 'START_GAME') {
             const roomRef = db.ref('rooms/' + roomId);
-            // 获取玩家职业，影响开场
+            
+            // 读取房主职业，定制开场
             const pSnap = await roomRef.child(`players/${userId}/profile`).once('value');
             const role = pSnap.val()?.role || "流浪者";
+            const name = pSnap.val()?.name || "V";
 
-            const prompt = `GAME START. Player is a ${role}. Generate the first scene.`;
+            const prompt = `GAME START. Player is a ${role} named ${name}. Generate the first scene.`;
             const aiJson = await generateStory(prompt);
 
             await roomRef.child('current_scene').set(aiJson);
-            await roomRef.update({ status: 'PLAYING' }); // 标记为正在玩
+            await roomRef.update({ status: 'PLAYING' });
             await roomRef.child('history').set([`[开场] ${aiJson.stage_1_env}`]);
 
             return res.status(200).json({ status: "STARTED" });
         }
 
-        // --- 4. 玩家行动 (兼容多人与单人) ---
+        // --- 4. 玩家行动 (带身份叙事) ---
         if (action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             await roomRef.child(`players/${userId}`).update({ choice: choiceText });
@@ -88,34 +92,28 @@ export default async function handler(req, res) {
             const players = roomData.players || {};
             const playerIds = Object.keys(players);
             
-            // 检查所有人是否都选了
             const allReady = playerIds.every(pid => players[pid].choice);
 
             if (!allReady) return res.status(200).json({ status: "WAITING" });
 
-            // 生成
-            const historySnap = await roomRef.child('history').once('value');
-            const historyList = historySnap.val() || [];
-            
-            // 汇总动作 + 身份
+            // 收集动作 + 身份信息
             let summary = "";
             playerIds.forEach(pid => {
                 const p = players[pid];
-                summary += `[${p.profile.role} ${p.profile.name}] 选择了: ${p.choice}; `;
+                // AI 会看到：[黑客 Neo] 选择了: 攻击
+                summary += `[${p.profile?.role || 'Unknown'} ${p.profile?.name || 'Player'}] 选择了: ${p.choice}; `;
             });
 
-            const prompt = `[History]: ${historyList.slice(-3).join("\n")}\n[Actions]: ${summary}\nContinue story.`;
+            const historySnap = await roomRef.child('history').once('value');
+            const historyList = historySnap.val() || [];
+            // 兼容性处理：把对象转数组
+            let cleanHistory = Array.isArray(historyList) ? historyList : Object.values(historyList);
+
+            const prompt = `[History]: ${cleanHistory.slice(-3).join("\n")}\n[Actions]: ${summary}\nContinue story.`;
             const aiJson = await generateStory(prompt);
 
             await roomRef.child('current_scene').set(aiJson);
-            
-            // 处理历史记录格式兼容性
-            let newHistory = historyList;
-            if (typeof newHistory === 'object') newHistory = Object.values(newHistory);
-            newHistory.push(`[事件] ${aiJson.stage_2_event}`);
-            // 截断历史防止过长
-            if(newHistory.length > 10) newHistory = newHistory.slice(-10);
-            await roomRef.child('history').set(newHistory);
+            await roomRef.child('history').push(`[事件] ${aiJson.stage_2_event}`);
             
             const updates = {};
             playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
