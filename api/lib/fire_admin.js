@@ -1,6 +1,5 @@
 import admin from 'firebase-admin';
 
-// 单例模式：保证数据库只连接一次，防止报错
 let dbInstance = null;
 
 export function getDb() {
@@ -14,6 +13,7 @@ export function getDb() {
             if (!serviceAccountStr || !dbUrl) throw new Error("环境变量缺失");
 
             let serviceAccount = JSON.parse(serviceAccountStr);
+            // 修复私钥换行符 (关键)
             if (serviceAccount.private_key) {
                 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
             }
@@ -22,10 +22,9 @@ export function getDb() {
                 credential: admin.credential.cert(serviceAccount),
                 databaseURL: dbUrl
             });
-            console.log("Firebase Admin 初始化成功");
         } catch (e) {
-            console.error("Firebase 初始化失败:", e);
-            throw e;
+            console.error("Firebase Init Error:", e);
+            throw e; // 抛出错误让 game.js 处理
         }
     }
     
