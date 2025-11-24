@@ -3,122 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // V14.0_LOBBY</title>
+    <title>NEURAL_LINK // V15.0_CHAR</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        /* --- 基础样式复用 --- */
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap');
-        :root { --bg-color: #000000; --term-bg: rgba(5, 5, 5, 0.95); --neon-cyan: #00f3ff; --neon-pink: #ff0055; --ui-border: rgba(255, 255, 255, 0.2); --font-title: 'ZCOOL QingKe HuangYou', cursive; --font-body: 'Noto Sans SC', sans-serif; }
-        body { margin: 0; background: #000; color: #e0f0ff; font-family: var(--font-body); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        :root { 
+            --bg-color: #050505; 
+            --neon-cyan: #00f3ff; 
+            --neon-pink: #ff0055; 
+            --neon-yellow: #fcee0a; 
+            --neon-red: #ff2a2a;
+            --ui-bg: rgba(10, 15, 20, 0.95);
+            --font-title: 'ZCOOL QingKe HuangYou', cursive; 
+            --font-body: 'Noto Sans SC', sans-serif; 
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; background: var(--bg-color); color: #eee; font-family: var(--font-body); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* BG */
         #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
-        .vignette { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle, transparent 40%, #000 100%); pointer-events: none; }
         .scanlines { position: fixed; inset: 0; z-index: 2; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; }
         .hidden { display: none !important; }
-        
-        /* --- UI 组件 --- */
-        .cyber-btn { background: rgba(10, 20, 30, 0.9); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 12px; font-family: var(--font-title); font-size: 1.1rem; width: 100%; margin-bottom: 10px; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
-        .cyber-btn:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 15px var(--neon-cyan); }
-        .cyber-btn.secondary { border-color: #555; color: #888; }
-        
-        /* --- ID CARD (身份卡) --- */
-        .id-card { border: 1px solid var(--neon-pink); padding: 15px; margin-bottom: 20px; background: rgba(20, 0, 10, 0.6); width: 100%; max-width: 300px; text-align: left; position: relative; }
-        .id-card::before { content:"IDENTITY"; position:absolute; top:-10px; left:10px; background:#000; padding:0 5px; color:var(--neon-pink); font-size:0.8rem; }
-        .id-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
-        .id-label { color: #666; }
-        .id-val { color: #fff; font-weight: bold; }
 
-        /* --- LOBBY LIST --- */
-        #room-list-container { width: 100%; max-width: 400px; max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; background: rgba(0,0,0,0.8); margin-bottom: 20px; }
-        .room-item { border: 1px solid #444; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s; }
-        .room-item:hover { border-color: var(--neon-cyan); background: rgba(0, 243, 255, 0.1); }
-        .room-info { display: flex; flex-direction: column; text-align: left; }
-        .room-host { color: var(--neon-cyan); font-size: 1rem; }
-        .room-status { color: #666; font-size: 0.8rem; }
+        /* COMMON UI */
+        .cyber-btn { 
+            background: rgba(0, 20, 40, 0.8); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); 
+            padding: 12px; font-family: var(--font-title); font-size: 1.1rem; width: 100%; margin-bottom: 10px; 
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1px; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        .cyber-btn:active { background: var(--neon-cyan); color: #000; }
+        .cyber-btn.danger { border-color: var(--neon-red); color: var(--neon-red); }
         
+        input, textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; margin-bottom: 10px; font-family: monospace; }
+
         /* SCREENS */
         #modal, #terminal { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; }
-        #modal { justify-content: center; align-items: center; background: rgba(0,0,0,0.95); }
-        #terminal { background: var(--term-bg); visibility: hidden; }
+        #modal { justify-content: center; align-items: center; background: rgba(0,0,0,0.95); padding: 20px; }
         
-        /* Terminal Layout */
-        header { height: 40px; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ui-border); background: #111; }
-        #visual-container { height: 30vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; }
+        /* --- CHARACTER HUD (NEW) --- */
+        #char-hud {
+            width: 100%; max-width: 400px;
+            display: flex; flex-direction: column; gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .hud-panel {
+            background: rgba(0,0,0,0.6); border: 1px solid #444; padding: 10px; position: relative;
+        }
+        .hud-title {
+            font-family: var(--font-title); font-size: 0.9rem; letter-spacing: 2px; 
+            position: absolute; top: -10px; left: 10px; background: #000; padding: 0 5px;
+        }
+
+        /* Public Panel (Green/Cyan) */
+        .panel-public { border-color: var(--neon-cyan); }
+        .panel-public .hud-title { color: var(--neon-cyan); }
+        
+        /* Private Panel (Red/Pink) */
+        .panel-private { border-color: var(--neon-pink); background: repeating-linear-gradient(45deg, rgba(255,0,85,0.05), rgba(255,0,85,0.05) 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px); }
+        .panel-private .hud-title { color: var(--neon-pink); }
+
+        .stat-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; border-bottom: 1px dashed #333; padding-bottom: 2px; }
+        .stat-label { color: #888; }
+        .stat-val { color: #fff; font-weight: bold; }
+        .item-tag { display: inline-block; background: #222; padding: 2px 6px; font-size: 0.75rem; margin-right: 5px; border: 1px solid #444; margin-top: 5px; }
+        .item-tag.secret { border-color: var(--neon-pink); color: var(--neon-pink); }
+
+        /* TERMINAL & GAME */
+        #terminal { background: var(--term-bg); visibility: hidden; }
+        header { height: 40px; padding: 0 15px; border-bottom: 1px solid var(--ui-border); display: flex; justify-content: space-between; align-items: center; background: #111; }
+        #visual-container { height: 25vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; }
         #scene-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: 0.5s; }
         #content-scroll { flex: 1; overflow-y: auto; padding: 20px; }
         .msg-block { margin-bottom: 15px; border-left: 3px solid #555; padding-left: 10px; color: #ccc; opacity: 0; transform: translateY(10px); transition: 0.5s; }
         .msg-block.show { opacity: 1; transform: translateY(0); }
-        #controls-area { padding: 20px; background: #111; border-top: 1px solid #333; }
+        #controls-area { padding: 15px; background: #111; border-top: 1px solid #333; }
         
-        /* Intro & Overlay */
         #intro-layer { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.5rem; transition: 1s; }
-        .overlay-ui { position: absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.5); padding:5px; font-size:0.8rem; }
-        #wait-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); }
-        
-        input, textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; margin-bottom: 10px; }
+        #wait-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; justify-content: center; align-items: center; flex-direction: column; color: var(--neon-cyan); font-family: var(--font-title); }
     </style>
 </head>
 <body>
 
 <div id="canvas-container"></div>
-<div class="vignette"></div>
 <div class="scanlines"></div>
 
-<!-- SETUP & LOBBY -->
+<!-- SETUP / LOBBY / CHAR GEN -->
 <div id="modal">
-    <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:3rem; margin-bottom:20px">NEURAL NET</h1>
+    <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:2.5rem; margin-bottom:10px">NEURAL LINK</h1>
     
     <!-- Step 1: Config -->
-    <div id="step-config" style="width: 300px;">
-        <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:80px"></textarea>
-        <button class="cyber-btn" onclick="initFirebase()">初始化系统</button>
+    <div id="step-config">
+        <p style="color:#666; font-size:0.8rem">需连接云端数据库以存储档案</p>
+        <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:60px"></textarea>
+        <button class="cyber-btn" onclick="initApp()">初始化 (INIT)</button>
     </div>
 
-    <!-- Step 2: Lobby -->
-    <div id="step-lobby" class="hidden" style="width: 100%; max-width: 400px; text-align: center;">
-        <!-- 身份卡片 -->
-        <div class="id-card">
-            <div class="id-row"><span class="id-label">ID:</span> <span class="id-val" id="card-uid">...</span></div>
-            <div class="id-row"><span class="id-label">代号:</span> <span class="id-val" id="card-name">...</span></div>
-            <div class="id-row"><span class="id-label">职业:</span> <span class="id-val" id="card-role" style="color:var(--neon-yellow)">...</span></div>
-            <div class="id-row"><span class="id-label">HP:</span> <span class="id-val">100%</span></div>
+    <!-- Step 2: Character Sheet (Lobby) -->
+    <div id="step-lobby" class="hidden" style="width:100%; text-align:center">
+        
+        <!-- 角色 HUD -->
+        <div id="char-hud">
+            <!-- 公开信息 -->
+            <div class="hud-panel panel-public">
+                <div class="hud-title">公开档案 (PUBLIC)</div>
+                <div class="stat-row"><span class="stat-label">代号:</span> <span class="stat-val" id="hud-name">...</span></div>
+                <div class="stat-row"><span class="stat-label">职业:</span> <span class="stat-val" id="hud-role">...</span></div>
+                <div class="stat-row"><span class="stat-label">生命体征:</span> <span class="stat-val" id="hud-hp" style="color:var(--neon-cyan)">100%</span></div>
+                <div class="stat-row"><span class="stat-label">外观特征:</span> <span class="stat-val" id="hud-look" style="font-size:0.8rem; text-align:right; width:60%">...</span></div>
+                <div id="hud-public-items"></div>
+            </div>
+
+            <!-- 私密信息 -->
+            <div class="hud-panel panel-private">
+                <div class="hud-title">绝密数据 (EYES ONLY)</div>
+                <div class="stat-row"><span class="stat-label">精神状态:</span> <span class="stat-val" id="hud-san" style="color:var(--neon-pink)">...</span></div>
+                <div class="stat-row"><span class="stat-label">秘密任务:</span> <span class="stat-val" id="hud-secret" style="font-size:0.8rem; text-align:right; width:60%">...</span></div>
+                <div id="hud-private-items"></div>
+            </div>
         </div>
 
-        <!-- 位面列表 -->
-        <div style="text-align:left; color:#666; margin-bottom:5px">▼ 活跃位面 (Active Sessions)</div>
-        <div id="room-list-container">
-            <div style="text-align:center; padding:20px; color:#444">正在扫描信号...</div>
+        <button class="cyber-btn" onclick="createRoom()">建立位面 (HOST)</button>
+        <div style="display:flex; gap:10px">
+            <input id="room-input" placeholder="输入位面ID" style="margin:0">
+            <button class="cyber-btn" style="width:auto; margin:0" onclick="joinRoom()">加入</button>
         </div>
-
-        <button class="cyber-btn" onclick="createSoloGame()">开启单人位面 (START SOLO)</button>
+        
+        <div style="margin-top:20px; border-top:1px dashed #333; padding-top:10px">
+            <small style="color:#666; cursor:pointer" onclick="deleteCharacter()">[⚠ 重置角色 / 自杀]</small>
+        </div>
+    </div>
+    
+    <!-- Waiting Room -->
+    <div id="step-waiting" class="hidden" style="text-align:center">
+        <h2 id="room-code-disp" style="color:var(--neon-yellow); font-size:3rem">....</h2>
+        <p style="color:#888">等待接入...</p>
+        <div id="player-count" style="color:var(--neon-cyan); margin:20px 0">连接数: 1</div>
+        <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
     </div>
 </div>
 
 <!-- INTRO -->
-<div id="intro-layer" class="hidden">正在接入神经链接...</div>
+<div id="intro-layer" class="hidden">神经同步中...</div>
 
-<!-- GAME -->
+<!-- GAME TERMINAL -->
 <div id="terminal">
     <header>
-        <div>ROOM: <span id="hud-room">0000</span></div>
-        <div style="font-size:0.8rem; opacity:0.7">SYNC: <span id="sync-status" style="color:var(--neon-cyan)">OK</span></div>
+        <div>ROOM: <span id="game-room-id">0000</span></div>
+        <div><span id="status-text" style="color:var(--neon-cyan)">LIVE</span></div>
     </header>
-    
     <div id="visual-container">
         <img id="scene-img" src="">
-        <div class="overlay-ui"><span>FEED: <span id="loading-hint">STANDBY</span></span></div>
+        <div style="position:absolute; top:10px; left:10px; font-size:0.8rem; background:rgba(0,0,0,0.5); padding:2px 5px">VISUAL FEED</div>
     </div>
-    
-    <div id="content-scroll">
-        <div id="story-box"></div>
-    </div>
-    
-    <div id="controls-area" style="position:relative">
-        <div id="wait-overlay" class="hidden">等待同步...</div>
-        <div id="next-trigger" style="text-align:center; padding:10px; color:#888; display:none; border-bottom:1px solid #333" onclick="advanceFragment()">▼ 点击继续 ▼</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px">
+    <div id="content-scroll"><div id="story-box"></div></div>
+    <div id="controls-area">
+        <div id="wait-overlay" class="hidden"><p>等待全员决策...</p></div>
+        <div id="next-trigger" style="text-align:center; color:#888; display:none; padding:10px; cursor:pointer" onclick="advanceFragment()">▼ 继续 ▼</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
             <button id="btn-a" class="cyber-btn" onclick="makeChoice('A')">A</button>
             <button id="btn-b" class="cyber-btn" onclick="makeChoice('B')">B</button>
         </div>
@@ -127,208 +174,211 @@
 
 <script>
     let db, auth, user;
-    let myProfile = {};
+    let myProfile = null; // 核心：当前角色的完整数据
     let currentRoomId = null;
     let currentData = null;
     let currentStage = 0;
+    let preBuffer = { A: null, B: null };
 
-    // --- 1. INIT & IDENTITY GEN ---
-    function initFirebase() {
+    // --- 1. INIT & AUTH ---
+    function initApp() {
         const cfgStr = document.getElementById('config-input').value.trim();
-        if(!cfgStr) return alert("请输入配置");
+        if(!cfgStr) return alert("Config Required");
         try {
             let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1) : cfgStr;
             const config = new Function("return " + clean)();
             firebase.initializeApp(config);
             auth = firebase.auth();
             db = firebase.database();
-            
             auth.signInAnonymously().then(u => {
                 user = u.user;
-                generateIdentity(); // 生成身份
-                document.getElementById('step-config').classList.add('hidden');
-                document.getElementById('step-lobby').classList.remove('hidden');
-                listenToRooms(); // 开始监听房间列表
+                loadCharacter(); // ★ 核心改变：登录后先加载角色
                 initParticles();
             });
-        } catch(e) { alert("配置解析错误"); }
+        } catch(e) { alert("配置错误"); }
     }
 
-    function generateIdentity() {
-        const roles = ["黑客 (Netrunner)", "独狼 (Solo)", "街头医生 (Ripperdoc)", "公司特工 (Corp)", "流浪者 (Nomad)"];
-        const names = ["V", "K", "Ghost", "Zero", "Echo", "Neon", "Rat"];
-        
-        myProfile = {
-            uid: user.uid,
-            name: names[Math.floor(Math.random()*names.length)] + "_" + Math.floor(Math.random()*99),
-            role: roles[Math.floor(Math.random()*roles.length)],
-            hp: 100
-        };
-
-        // UI Display
-        document.getElementById('card-uid').innerText = user.uid.slice(0,5);
-        document.getElementById('card-name').innerText = myProfile.name;
-        document.getElementById('card-role').innerText = myProfile.role;
-    }
-
-    // --- 2. LOBBY SYSTEM (V14.1 修复版) ---
-    function listenToRooms() {
-        const listRef = db.ref('rooms');
-        // 监听最后 20 个房间
-        listRef.limitToLast(20).on('value', snapshot => {
-            const container = document.getElementById('room-list-container');
-            container.innerHTML = "";
-            
-            const rooms = snapshot.val();
-            if(!rooms) {
-                container.innerHTML = "<div style='text-align:center; padding:20px; color:#444'>暂无信号源</div>";
-                return;
+    // --- 2. CHARACTER SYSTEM (核心新逻辑) ---
+    
+    // 加载或创建角色
+    function loadCharacter() {
+        const userRef = db.ref('users/' + user.uid);
+        userRef.once('value', snapshot => {
+            const val = snapshot.val();
+            if (val && val.profile) {
+                // 老玩家：读取存档
+                myProfile = val.profile;
+                renderHUD();
+                showLobby();
+            } else {
+                // 新玩家：创建新角色
+                createNewCharacter();
             }
-
-            // 倒序排列（新的在上面）
-            const roomKeys = Object.keys(rooms).reverse();
-
-            roomKeys.forEach(rid => {
-                const r = rooms[rid];
-                
-                // --- 修复 1: 脏数据过滤 ---
-                // 如果没有 host_info，说明是旧版本的尸体房间，直接跳过
-                if (!r.host_info || !r.host_info.name) return;
-
-                // --- 修复 2: 状态显示逻辑 ---
-                // 显示条件：是 SOLO (刚建好) OR 是 PLAYING (正在玩，支持乱入)
-                // 你可以在这里加人数限制，比如 if (playerCount >= 2) return;
-                const playerCount = r.players ? Object.keys(r.players).length : 0;
-                const isMine = r.players && r.players[user.uid];
-                
-                // 如果是 PLAYING 且不是我的房间，且人数已满2人，可以根据需求决定是否隐藏
-                // 这里我们先全部显示，方便测试
-                
-                const div = document.createElement('div');
-                div.className = 'room-item';
-                
-                // 不同状态不同颜色
-                let statusColor = '#666';
-                let statusText = r.status;
-                if(r.status === 'SOLO') { statusText = "等待连接"; statusColor = 'var(--neon-green)'; }
-                if(r.status === 'PLAYING') { statusText = "正在进行"; statusColor = 'var(--neon-yellow)'; }
-
-                div.innerHTML = `
-                    <div class="room-info">
-                        <span class="room-host">[${r.host_info.role}] ${r.host_info.name}</span>
-                        <span class="room-status" style="color:${statusColor}">
-                            ● ${statusText} | 人数: ${playerCount}/2
-                        </span>
-                    </div>
-                    <div style="color:var(--neon-cyan)">${isMine ? '重连 >' : '接入 >'}</div>
-                `;
-                
-                div.onclick = () => joinGame(rid);
-                container.appendChild(div);
-            });
         });
     }
 
-    // --- 3. GAME ACTIONS ---
-    
-    // 创建单人游戏
-    async function createSoloGame() {
-        const btn = document.querySelector('button[onclick="createSoloGame()"]');
-        btn.innerText = "初始化中..."; btn.disabled = true;
+    // 随机生成器
+    function createNewCharacter() {
+        const roles = [
+            { id: "Solo", label: "独狼佣兵", hp: 120, items: ["突击步枪", "止痛药"], secret: "被荒坂通缉" },
+            { id: "Netrunner", label: "黑客", hp: 80, items: ["接入仓", "智能手枪"], secret: "脑中有损坏的数据" },
+            { id: "Techie", label: "技师", hp: 100, items: ["工程手套", "霰弹枪"], secret: "偷了公司的原型机" },
+            { id: "Corpo", label: "公司狗", hp: 90, items: ["高级西装", "消音手枪"], secret: "其实是双重间谍" }
+        ];
         
+        const r = roles[Math.floor(Math.random() * roles.length)];
+        const nameCode = Math.floor(Math.random()*999);
+        
+        myProfile = {
+            name: `${r.id}_${nameCode}`,
+            role: r.label,
+            // 【表】公开数据
+            public: {
+                hp: r.hp,
+                max_hp: r.hp,
+                appearance: "普通的赛博格外观",
+                visible_items: [r.items[0]] // 第一个道具公开
+            },
+            // 【里】私密数据
+            private: {
+                sanity: 100,
+                hidden_items: [r.items[1]], // 第二个道具隐藏
+                secret_mission: r.secret
+            }
+        };
+
+        // 存入永久数据库
+        db.ref('users/' + user.uid).set({
+            profile: myProfile,
+            created_at: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        renderHUD();
+        showLobby();
+    }
+
+    // 渲染 HUD
+    function renderHUD() {
+        // Public
+        document.getElementById('hud-name').innerText = myProfile.name;
+        document.getElementById('hud-role').innerText = myProfile.role;
+        document.getElementById('hud-hp').innerText = myProfile.public.hp + "/" + myProfile.public.max_hp;
+        document.getElementById('hud-look').innerText = myProfile.public.appearance;
+        
+        const pubBox = document.getElementById('hud-public-items');
+        pubBox.innerHTML = myProfile.public.visible_items.map(i => `<span class="item-tag">${i}</span>`).join('');
+
+        // Private
+        document.getElementById('hud-san').innerText = myProfile.private.sanity + "%";
+        document.getElementById('hud-secret').innerText = myProfile.private.secret_mission;
+        
+        const privBox = document.getElementById('hud-private-items');
+        privBox.innerHTML = myProfile.private.hidden_items.map(i => `<span class="item-tag secret">🔒 ${i}</span>`).join('');
+    }
+
+    // 自杀/重置
+    function deleteCharacter() {
+        if(confirm("确定要销毁义体并重置身份吗？(不可逆)")) {
+            db.ref('users/' + user.uid).remove().then(() => {
+                location.reload();
+            });
+        }
+    }
+
+    function showLobby() {
+        document.getElementById('step-config').classList.add('hidden');
+        document.getElementById('step-lobby').classList.remove('hidden');
+        // 此处暂时不显示列表，先聚焦于角色展示
+    }
+
+    // --- 3. LOBBY & SYNC (适配新 Profile) ---
+
+    async function createRoom() {
+        const btn = document.querySelector('button[onclick="createRoom()"]');
+        btn.innerText = "INIT..."; btn.disabled = true;
         try {
             // 1. Create
             const res = await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile })
+                body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile }) // 带上身份！
             });
             const data = await res.json();
             currentRoomId = data.roomId;
 
-            // 2. Join self
+            // 2. Join Self
             await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile })
             });
 
-            // 3. Start
-            startTransition();
-            await fetch('/api/game', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'START_GAME', roomId: currentRoomId, userId: user.uid })
+            // UI
+            document.getElementById('step-lobby').classList.add('hidden');
+            document.getElementById('step-waiting').classList.remove('hidden');
+            document.getElementById('room-code-disp').innerText = currentRoomId;
+            
+            db.ref(`rooms/${currentRoomId}/players`).on('value', s => {
+                document.getElementById('player-count').innerText = `连接数: ${s.numChildren()}`;
             });
 
-        } catch(e) { alert(e.message); btn.innerText="开启单人位面"; btn.disabled=false; }
+        } catch(e) { alert(e.message); btn.disabled=false; }
     }
 
-    // 加入游戏 (无论是自己的旧房间，还是别人的房间)
-    async function joinGame(rid) {
-        currentRoomId = rid;
+    async function joinRoom() {
+        const rid = document.getElementById('room-input').value;
         try {
-            // 尝试加入 (后端会处理重复加入)
             const res = await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: rid, userId: user.uid, userProfile: myProfile })
+                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: rid, userId: user.uid, userProfile: myProfile }) // 带上身份
             });
-            
             if(res.ok) {
-                startTransition(); // 进入监听模式
-            } else {
-                alert("无法接入该位面");
-            }
-        } catch(e) { alert("连接错误"); }
+                currentRoomId = rid;
+                enterGameMode();
+            } else alert("连接失败");
+        } catch(e) { alert("ERR"); }
     }
 
-    // 过场动画 + 切换界面
-    function startTransition() {
-        document.getElementById('modal').style.display = 'none';
-        const intro = document.getElementById('intro-layer');
-        intro.classList.remove('hidden');
-        intro.style.opacity = 1;
-        
-        // 监听数据库
-        const roomRef = db.ref(`rooms/${currentRoomId}`);
-        
-        // 监听剧情更新
-        roomRef.child('current_scene').on('value', snapshot => {
-            const data = snapshot.val();
-            if(data) {
-                // 数据来了，关闭 Intro，显示游戏
-                intro.style.opacity = 0;
-                setTimeout(()=>intro.classList.add('hidden'), 1000);
-                
-                const term = document.getElementById('terminal');
-                term.style.visibility = 'visible';
-                term.style.opacity = 1;
-                document.getElementById('hud-room').innerText = currentRoomId;
-                
-                renderScene(data);
-            }
-        });
-    }
-
-    // --- 4. RENDER & PLAY ---
-    // (这部分逻辑与之前一致，只负责显示)
+    // --- 4. GAME LOOP (Same as V13.1) ---
     
-    async function makeChoice(text) {
-        document.getElementById('wait-overlay').classList.remove('hidden');
-        const choiceText = (text === 'A') ? currentData.choices[0].text : currentData.choices[1].text;
-        
-        await fetch('/api/game', {
+    function firstStart() {
+        enterGameMode(); // Listen first
+        fetch('/api/game', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText })
+            body: JSON.stringify({ action: 'START_GAME', roomId: currentRoomId, userId: user.uid })
         });
+    }
+
+    function enterGameMode() {
+        document.getElementById('modal').style.display = 'none';
+        const term = document.getElementById('terminal');
+        term.style.visibility = 'visible'; term.style.opacity = 1;
+        document.getElementById('game-room-id').innerText = currentRoomId;
+
+        db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
+            const data = snapshot.val();
+            if(data) renderScene(data);
+        });
+    }
+
+    async function makeChoice(text) {
+        if(text !== "START_GAME") document.getElementById('wait-overlay').classList.remove('hidden');
+        const choiceText = (text === "START_GAME") ? "Start" : (text === 'A' ? document.getElementById('btn-a').innerText : document.getElementById('btn-b').innerText);
+        
+        try {
+            await fetch('/api/game', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText })
+            });
+        } catch(e) { document.getElementById('wait-overlay').classList.add('hidden'); }
     }
 
     function renderScene(data) {
         document.getElementById('wait-overlay').classList.add('hidden');
         currentData = data; currentStage = 0;
-        
         document.getElementById('story-box').innerHTML = "";
         document.getElementById('next-trigger').style.display = 'none';
         
@@ -336,16 +386,14 @@
         const rawKw = data.image_keyword || "city";
         const kw = rawKw.split(' ')[0].replace(/[^a-zA-Z0-9]/g,"");
         const url = `https://loremflickr.com/640/360/cyberpunk,${kw}?random=${Date.now()}`;
-        const img = document.getElementById('scene-img');
-        img.style.opacity = 0; img.src = url;
-        img.onload = () => { img.style.opacity = 0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
+        const img = document.getElementById('scene-img'); img.style.opacity=0; img.src=url;
+        img.onload = () => img.style.opacity=0.8;
 
         // Text
-        const addP = (txt, color) => {
-            const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
-            document.getElementById('story-box').appendChild(d);
-            setTimeout(()=>d.classList.add('show'), 50);
-        };
+        const addP = (txt, c) => {
+            const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=c; d.innerText=txt;
+            document.getElementById('story-box').appendChild(d); setTimeout(()=>d.classList.add('show'), 50);
+        }
         addP(data.stage_1_env, 'var(--neon-cyan)');
         setTimeout(()=>{
             addP(data.stage_2_event, 'var(--neon-pink)');
@@ -353,14 +401,14 @@
                 addP(data.stage_3_analysis, 'var(--neon-yellow)');
                 document.getElementById('btn-a').innerText = `[A] ${data.choices[0].text}`;
                 document.getElementById('btn-b').innerText = `[B] ${data.choices[1].text}`;
-                // Auto scroll
-                const box = document.getElementById('content-scroll'); box.scrollTop = box.scrollHeight;
+                const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
             }, 1500);
         }, 1000);
     }
 
-    function initParticles(){const c=document.getElementById('canvas-container');const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);const cam=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,1,1000);cam.position.z=100;const r=new THREE.WebGLRenderer({alpha:true});r.setSize(window.innerWidth,window.innerHeight);c.appendChild(r.domElement);const g=new THREE.BufferGeometry();const v=[],cl=[];for(let i=0;i<1500;i++){v.push((Math.random()-0.5)*400,(Math.random()-0.5)*400,(Math.random()-0.5)*400);const c=[0x00f3ff,0xbc13fe,0xff0055][Math.floor(Math.random()*3)];const hc=new THREE.Color(c);cl.push(hc.r,hc.g,hc.b);}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));const m=new THREE.PointsMaterial({size:2,vertexColors:true,opacity:0.7,transparent:true});const p=new THREE.Points(g,m);s.add(p);const a=()=>{requestAnimationFrame(a);p.rotation.x+=0.0005;r.render(s,cam);};a();}
+    function advanceFragment() { /* ... (Same logic, handled automatically now) ... */ }
+    function initParticles(){const c=document.getElementById('canvas-container');if(!c)return;const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);const cam=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,1,1000);cam.position.z=100;const r=new THREE.WebGLRenderer({alpha:true});r.setSize(window.innerWidth,window.innerHeight);c.innerHTML='';c.appendChild(r.domElement);const g=new THREE.BufferGeometry();const v=[],cl=[];for(let i=0;i<1500;i++){v.push((Math.random()-0.5)*400,(Math.random()-0.5)*400,(Math.random()-0.5)*400);const c=[0x00f3ff,0xbc13fe,0xff0055][Math.floor(Math.random()*3)];const hc=new THREE.Color(c);cl.push(hc.r,hc.g,hc.b);}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));const m=new THREE.PointsMaterial({size:2,vertexColors:true,opacity:0.7,transparent:true});const p=new THREE.Points(g,m);s.add(p);const a=()=>{requestAnimationFrame(a);p.rotation.x+=0.0005;r.render(s,cam);};a();window.addEventListener('resize',()=>{cam.aspect=window.innerWidth/window.innerHeight;cam.updateProjectionMatrix();r.setSize(window.innerWidth,window.innerHeight);});}
+    async function playIntroSequence(){const i=document.getElementById('intro-layer');i.classList.remove('hidden');i.style.opacity=1;await new Promise(r=>setTimeout(r,2000));i.style.opacity=0;setTimeout(()=>i.classList.add('hidden'),1000);}
 </script>
 </body>
 </html>
-
