@@ -171,42 +171,60 @@
         document.getElementById('card-role').innerText = myProfile.role;
     }
 
-    // --- 2. LOBBY SYSTEM ---
+    // --- 2. LOBBY SYSTEM (V14.1 修复版) ---
     function listenToRooms() {
         const listRef = db.ref('rooms');
-        // 只显示最近的 10 个房间
-        listRef.limitToLast(10).on('value', snapshot => {
+        // 监听最后 20 个房间
+        listRef.limitToLast(20).on('value', snapshot => {
             const container = document.getElementById('room-list-container');
             container.innerHTML = "";
             
             const rooms = snapshot.val();
             if(!rooms) {
-                container.innerHTML = "<div style='text-align:center; padding:20px; color:#444'>暂无信号</div>";
+                container.innerHTML = "<div style='text-align:center; padding:20px; color:#444'>暂无信号源</div>";
                 return;
             }
 
-            // 遍历并渲染房间
-            Object.keys(rooms).forEach(rid => {
+            // 倒序排列（新的在上面）
+            const roomKeys = Object.keys(rooms).reverse();
+
+            roomKeys.forEach(rid => {
                 const r = rooms[rid];
-                // 只显示 SOLO 状态的房间（可加入）或者自己所在的房间
-                if (r.status === 'SOLO' || (r.players && r.players[user.uid])) {
-                    const div = document.createElement('div');
-                    div.className = 'room-item';
-                    
-                    // 房主信息
-                    const hostInfo = r.host_info || { name: 'Unknown', role: 'Ghost' };
-                    const isMine = r.players && r.players[user.uid];
-                    
-                    div.innerHTML = `
-                        <div class="room-info">
-                            <span class="room-host">[${hostInfo.role}] ${hostInfo.name}</span>
-                            <span class="room-status">ID: ${rid} | ${r.status}</span>
-                        </div>
-                        <div style="color:var(--neon-cyan)">${isMine ? '重连 >' : '加入 >'}</div>
-                    `;
-                    div.onclick = () => joinGame(rid);
-                    container.prepend(div); // 新的在上面
-                }
+                
+                // --- 修复 1: 脏数据过滤 ---
+                // 如果没有 host_info，说明是旧版本的尸体房间，直接跳过
+                if (!r.host_info || !r.host_info.name) return;
+
+                // --- 修复 2: 状态显示逻辑 ---
+                // 显示条件：是 SOLO (刚建好) OR 是 PLAYING (正在玩，支持乱入)
+                // 你可以在这里加人数限制，比如 if (playerCount >= 2) return;
+                const playerCount = r.players ? Object.keys(r.players).length : 0;
+                const isMine = r.players && r.players[user.uid];
+                
+                // 如果是 PLAYING 且不是我的房间，且人数已满2人，可以根据需求决定是否隐藏
+                // 这里我们先全部显示，方便测试
+                
+                const div = document.createElement('div');
+                div.className = 'room-item';
+                
+                // 不同状态不同颜色
+                let statusColor = '#666';
+                let statusText = r.status;
+                if(r.status === 'SOLO') { statusText = "等待连接"; statusColor = 'var(--neon-green)'; }
+                if(r.status === 'PLAYING') { statusText = "正在进行"; statusColor = 'var(--neon-yellow)'; }
+
+                div.innerHTML = `
+                    <div class="room-info">
+                        <span class="room-host">[${r.host_info.role}] ${r.host_info.name}</span>
+                        <span class="room-status" style="color:${statusColor}">
+                            ● ${statusText} | 人数: ${playerCount}/2
+                        </span>
+                    </div>
+                    <div style="color:var(--neon-cyan)">${isMine ? '重连 >' : '接入 >'}</div>
+                `;
+                
+                div.onclick = () => joinGame(rid);
+                container.appendChild(div);
             });
         });
     }
@@ -345,3 +363,4 @@
 </script>
 </body>
 </html>
+
