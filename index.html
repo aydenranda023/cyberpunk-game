@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // V16.0_RASHOMON</title>
+    <title>NEURAL_LINK // V17.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -24,8 +24,8 @@
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; background: var(--bg-color); color: #eee; font-family: var(--font-body); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* BG */
         #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        .vignette { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle, transparent 40%, #000 100%); pointer-events: none; }
         .scanlines { position: fixed; inset: 0; z-index: 2; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; }
         .hidden { display: none !important; }
 
@@ -37,26 +37,28 @@
         }
         .cyber-btn:active { background: var(--neon-cyan); color: #000; }
         
-        /* ID CARD */
+        /* ID CARD (Lobby) */
         .id-card { border: 1px solid var(--neon-pink); padding: 15px; margin-bottom: 20px; background: rgba(20, 0, 10, 0.8); width: 100%; max-width: 300px; text-align: left; }
         .id-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
         .id-val { color: #fff; font-weight: bold; }
 
-        /* ROOM LIST */
-        #room-list-container { width: 100%; max-width: 400px; height: 200px; overflow-y: auto; border: 1px solid #333; padding: 5px; background: rgba(0,0,0,0.8); margin-bottom: 10px; }
-        .room-item { border: 1px solid #444; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .room-host { color: var(--neon-cyan); font-size: 0.9rem; }
-        .room-status { color: #666; font-size: 0.8rem; }
-
         /* SCREENS */
         #modal { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); padding: 20px; }
-        textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; }
+        textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; margin-bottom: 10px;}
 
         /* GAME UI */
         #terminal { position: absolute; inset: 0; z-index: 50; background: var(--term-bg); visibility: hidden; display: flex; flex-direction: column; }
-        header { height: 40px; padding: 0 15px; border-bottom: 1px solid var(--ui-border); display: flex; justify-content: space-between; align-items: center; background: #111; }
         
-        #visual-container { height: 30vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; }
+        /* HUD BAR (NEW) */
+        #hud-bar {
+            display: flex; justify-content: space-between; padding: 8px 15px; background: #111; border-bottom: 1px solid #333; font-size: 0.8rem;
+        }
+        .hud-group { display: flex; gap: 10px; }
+        .hud-item { color: #888; }
+        .hud-val { color: var(--neon-cyan); font-weight: bold; }
+        .hud-val.secret { color: var(--neon-pink); }
+
+        #visual-container { height: 30vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; flex-shrink: 0;}
         #scene-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: 0.5s; }
         .overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; font-size: 0.8rem; color: #fff; }
 
@@ -64,22 +66,28 @@
         .msg-block { padding-left: 12px; border-left: 3px solid #333; opacity: 0; transform: translateY(10px); transition: 0.5s; font-size: 1rem; line-height: 1.6; color: #ddd; }
         .msg-block.show { opacity: 1; transform: translateY(0); }
         
-        /* COLORS */
-        .stage-1 { border-color: var(--neon-cyan); color: #d0ffff; }
-        .stage-2 { border-color: var(--neon-pink); color: #ffd0d0; }
-        .stage-3 { border-color: var(--neon-yellow); color: #ffffd0; }
-
-        /* CONTROLS */
-        #controls-area { padding: 15px; background: #111; border-top: 1px solid #333; }
+        #controls-area { padding: 15px; background: #111; border-top: 1px solid #333; position: relative; }
         #next-trigger { text-align: center; padding: 15px; color: #888; cursor: pointer; border-bottom: 1px solid #333; margin-bottom: 10px; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
         
-        #controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; opacity: 0.3; pointer-events: none; transition: 0.3s; }
-        #controls.active { opacity: 1; pointer-events: all; }
+        #controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; transition: 0.3s; }
         
-        #wait-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; justify-content: center; align-items: center; flex-direction: column; color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.2rem; }
+        /* 优化后的等待遮罩：只遮挡按钮区域 */
+        #wait-overlay { 
+            position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 20; 
+            display: flex; justify-content: center; align-items: center; 
+            color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.2rem; letter-spacing: 2px;
+        }
         
-        #intro-layer { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.5rem; transition: 1s; }
+        #intro-layer { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: 1s; }
+        .intro-text { font-family: var(--font-title); font-size: 1.8rem; color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan); margin-bottom: 30px; text-align: center; padding: 20px; opacity: 0; transition: 0.5s;}
+        .door-frame { position: absolute; width: 80px; height: 160px; border: 2px solid #fff; box-shadow: 0 0 50px #fff; opacity: 0; transition: 2s; }
+        .zoom-effect { animation: zoomIn 2.5s forwards ease-in; }
+        @keyframes zoomIn { 0% { transform: scale(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(60); opacity: 0; } }
+        
+        /* Lobby List */
+        #room-list-container { width: 100%; max-width: 400px; height: 150px; overflow-y: auto; border: 1px solid #333; margin-bottom: 10px; background: rgba(0,0,0,0.5); }
+        .room-item { padding: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; cursor: pointer; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -91,67 +99,64 @@
 <div id="modal">
     <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:2.5rem;">NEURAL LINK</h1>
     
-    <!-- 1. Config -->
     <div id="step-config">
-        <p style="font-size:0.8rem; color:#666">需连接云端数据库</p>
         <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:60px"></textarea>
         <button class="cyber-btn" onclick="initApp()">初始化 (INIT)</button>
     </div>
 
-    <!-- 2. Lobby -->
     <div id="step-lobby" class="hidden" style="width:100%; max-width:400px; text-align:center">
-        <!-- 身份展示 -->
         <div class="id-card">
-            <div class="id-row"><span style="color:#888">ID:</span> <span id="card-name">...</span></div>
-            <div class="id-row"><span style="color:#888">职业:</span> <span id="card-role" style="color:var(--neon-yellow)">...</span></div>
-            <div class="id-row"><span style="color:#888">状态:</span> <span id="card-hp" style="color:var(--neon-cyan)">100%</span></div>
+            <div class="id-row"><span class="id-val" id="card-name">...</span> <span class="id-val" id="card-role" style="color:var(--neon-yellow)">...</span></div>
             <div class="id-row" style="border-top:1px dashed #444; margin-top:5px; padding-top:5px">
-                <span style="color:#888">秘密:</span> <span id="card-secret" style="color:var(--neon-pink)">...</span>
+                <span style="color:#888">绝密:</span> <span id="card-secret" style="color:var(--neon-pink)">...</span>
             </div>
         </div>
-
-        <!-- 房间列表 -->
-        <div style="text-align:left; color:#666; font-size:0.8rem">▼ 活跃信号源</div>
-        <div id="room-list-container">
-            <div style="padding:20px; color:#444">正在扫描...</div>
+        <div id="room-list-container"></div>
+        <button class="cyber-btn" onclick="createSoloGame()">开启单人位面</button>
+        <div style="display:flex; gap:10px">
+            <input id="room-input" placeholder="位面ID" style="margin:0">
+            <button class="cyber-btn" style="width:auto; margin:0" onclick="joinRoom()">加入</button>
         </div>
-
-        <button class="cyber-btn" onclick="createSoloGame()">开启新位面 (HOST)</button>
-        <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">[重置身份]</div>
     </div>
     
-    <!-- 3. Waiting -->
-    <div id="step-waiting" class="hidden">
+    <div id="step-waiting" class="hidden" style="text-align:center">
         <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
-        <p style="color:#888">等待连接...</p>
+        <p style="color:#888">等待接入...</p>
         <div id="player-count" style="color:var(--neon-cyan); margin:20px">连接数: 1</div>
         <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
     </div>
 </div>
 
 <!-- INTRO -->
-<div id="intro-layer" class="hidden">神经同步中...</div>
+<div id="intro-layer" class="hidden">
+    <div id="intro-content" class="intro-text"></div>
+    <div id="the-door" class="door-frame"></div>
+</div>
 
 <!-- GAME TERMINAL -->
 <div id="terminal">
-    <header>
-        <div>ROOM: <span id="hud-room">0000</span></div>
-        <div><span id="status-text" style="color:var(--neon-cyan)">LIVE</span></div>
-    </header>
-    
+    <!-- 新增 HUD 状态栏 -->
+    <div id="hud-bar">
+        <div class="hud-group">
+            <span class="hud-item">代号:</span> <span class="hud-val" id="hud-name-disp">V</span>
+            <span class="hud-item" style="margin-left:10px">HP:</span> <span class="hud-val" id="hud-hp-disp">100</span>
+        </div>
+        <div class="hud-group">
+            <span class="hud-val secret" id="hud-item-disp">隐藏物品</span>
+        </div>
+    </div>
+
     <div id="visual-container">
         <img id="scene-img" src="">
         <div class="overlay-ui"><span>FEED: <span id="loading-hint">STANDBY</span></span></div>
     </div>
     
-    <div id="content-scroll">
-        <div id="story-box"></div>
-    </div>
+    <div id="content-scroll"><div id="story-box"></div></div>
     
     <div id="controls-area">
-        <div id="wait-overlay" class="hidden"><p>等待决策同步...</p></div>
+        <!-- 遮罩只盖这里 -->
+        <div id="wait-overlay" class="hidden"><p>等待全员决策...</p></div>
         
-        <!-- 三段式核心：手动点击继续 -->
         <div id="next-trigger" onclick="advanceFragment()">▼ 点击继续剧情 ▼</div>
         
         <div id="controls">
@@ -162,13 +167,13 @@
 </div>
 
 <script>
-    let db, auth, user;
-    let myProfile = null;
+    let db, auth, user, myProfile = null;
     let currentRoomId = null;
     let currentData = null;
-    let currentStage = 0; // 0=Env, 1=Event, 2=Analysis
+    let currentStage = 0;
+    let preBuffer = { A: null, B: null };
 
-    // --- INIT ---
+    // --- 1. INIT ---
     function initApp() {
         const cfgStr = document.getElementById('config-input').value.trim();
         if(!cfgStr) return alert("Config Required");
@@ -186,80 +191,61 @@
         } catch(e) { alert("配置错误"); }
     }
 
-    // --- IDENTITY (中文版) ---
     function loadCharacter() {
         db.ref('users/' + user.uid).once('value', s => {
             const val = s.val();
-            if (val && val.profile) { myProfile = val.profile; renderHUD(); showLobby(); }
+            if (val && val.profile) { myProfile = val.profile; renderLobby(); }
             else { createNewCharacter(); }
         });
     }
 
     function createNewCharacter() {
         const roles = [
-            { id: "Solo", label: "街头佣兵", hp: 120, secret: "被荒坂通缉" },
-            { id: "Netrunner", label: "网络黑客", hp: 80, secret: "脑中有损坏的数据" },
-            { id: "Techie", label: "义体技师", hp: 100, secret: "偷了公司的原型机" },
-            { id: "Corpo", label: "公司特工", hp: 90, secret: "其实是双重间谍" }
+            { id: "Solo", label: "街头佣兵", hp: 120, items: ["突击步枪"], secret: "被通缉" },
+            { id: "Netrunner", label: "黑客", hp: 80, items: ["黑客接入仓"], secret: "脑中数据损坏" },
+            { id: "Doc", label: "义体医生", hp: 90, items: ["急救针"], secret: "黑市贩卖器官" }
         ];
-        const prefixes = ["流浪", "荒坂", "军用", "街头", "夜之城", "暴恐"];
-        const names = ["V", "大卫", "露西", "强尼", "杰克", "罗格", "朱迪", "K"];
-        
         const r = roles[Math.floor(Math.random() * roles.length)];
-        const name = prefixes[Math.floor(Math.random()*prefixes.length)] + "·" + names[Math.floor(Math.random()*names.length)];
+        const name = ["V", "强尼", "杰克", "露西", "K"][Math.floor(Math.random()*5)] + "_" + Math.floor(Math.random()*99);
         
-        myProfile = { name: name, role: r.label, hp: r.hp, secret: r.secret };
+        myProfile = {
+            name: name, role: r.label,
+            public: { hp: r.hp, weapon: r.items[0] },
+            private: { secret: r.secret, hidden_items: r.items }
+        };
         
         db.ref('users/' + user.uid).set({ profile: myProfile });
-        renderHUD(); showLobby();
+        renderLobby();
     }
 
-    function renderHUD() {
+    function renderLobby() {
         document.getElementById('card-name').innerText = myProfile.name;
         document.getElementById('card-role').innerText = myProfile.role;
-        document.getElementById('card-hp').innerText = myProfile.hp;
-        document.getElementById('card-secret').innerText = myProfile.secret;
-    }
-
-    function deleteCharacter() {
-        if(confirm("重置将丢失当前进度，确定吗？")) { db.ref('users/'+user.uid).remove().then(()=>location.reload()); }
-    }
-
-    // --- LOBBY ---
-    function showLobby() {
+        document.getElementById('card-secret').innerText = myProfile.private.secret;
+        
         document.getElementById('step-config').classList.add('hidden');
         document.getElementById('step-lobby').classList.remove('hidden');
         
-        // 监听房间列表
-        db.ref('rooms').limitToLast(20).on('value', s => {
-            const container = document.getElementById('room-list-container');
-            container.innerHTML = "";
+        // Listen Rooms
+        db.ref('rooms').limitToLast(10).on('value', s => {
+            const div = document.getElementById('room-list-container');
+            div.innerHTML = "";
             const rooms = s.val();
-            if(!rooms) { container.innerHTML = "<div style='padding:10px'>暂无信号</div>"; return; }
-            
-            Object.keys(rooms).reverse().forEach(rid => {
-                const r = rooms[rid];
-                if (!r.host_info) return;
-                
-                const playerCount = r.players ? Object.keys(r.players).length : 0;
-                const div = document.createElement('div');
-                div.className = 'room-item';
-                let statusText = r.status === 'SOLO' ? "<span style='color:var(--neon-green)'>等待队友</span>" : "<span style='color:var(--neon-yellow)'>进行中</span>";
-                
-                div.innerHTML = `
-                    <div>
-                        <div class="room-host">[${r.host_info.role}] ${r.host_info.name}</div>
-                        <div class="room-status">ID: ${rid} | ${statusText} (${playerCount}/2)</div>
-                    </div>
-                    <div style="color:var(--neon-cyan)">接入 ></div>
-                `;
-                div.onclick = () => joinGame(rid);
-                container.appendChild(div);
-            });
+            if(rooms) {
+                Object.keys(rooms).reverse().forEach(rid => {
+                    const r = rooms[rid];
+                    if(!r.host_info) return;
+                    const item = document.createElement('div');
+                    item.className = 'room-item';
+                    item.innerHTML = `<span style="color:var(--neon-cyan)">[${r.host_info.role}] ${r.host_info.name}</span> <span>${r.status}</span>`;
+                    item.onclick = () => joinGame(rid);
+                    div.appendChild(item);
+                });
+            }
         });
     }
 
-    // --- GAME ACTIONS ---
+    // --- 2. GAME CONNECT ---
     async function createSoloGame() {
         try {
             const res = await fetch('/api/game', {
@@ -285,20 +271,18 @@
     }
 
     async function joinGame(rid) {
+        const ridVal = rid || document.getElementById('room-input').value;
         try {
             const res = await fetch('/api/game', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: rid, userId: user.uid, userProfile: myProfile })
+                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile })
             });
-            if(res.ok) {
-                currentRoomId = rid;
-                startTransition();
-            } else alert("无法加入");
-        } catch(e) { alert("ERR"); }
+            if(res.ok) { currentRoomId = ridVal; startTransition(); }
+        } catch(e) { alert("Error"); }
     }
 
     async function firstStart() {
-        // 房主点击开始：直接切入游戏监听，并请求 AI
+        // 并行：先播动画，同时让后台生成
         startTransition();
         await fetch('/api/game', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -306,88 +290,66 @@
         });
     }
 
+    // --- 3. INTRO & SYNC ---
     function startTransition() {
         document.getElementById('modal').style.display = 'none';
-        const intro = document.getElementById('intro-layer');
-        intro.classList.remove('hidden'); intro.style.opacity = 1;
         
-        const term = document.getElementById('terminal');
-        term.style.visibility = 'visible'; term.style.opacity = 1;
-        document.getElementById('hud-room').innerText = currentRoomId;
+        // 播放 Intro
+        playIntroSequence().then(() => {
+            const term = document.getElementById('terminal');
+            term.style.visibility = 'visible'; term.style.opacity = 1;
+            
+            // 更新 HUD
+            document.getElementById('hud-name-disp').innerText = myProfile.name;
+            document.getElementById('hud-hp-disp').innerText = myProfile.public.hp;
+            document.getElementById('hud-item-disp').innerText = "背包: " + myProfile.private.hidden_items.join(",");
 
-        // ★★★ 核心修改：监听 current_scene 下属于 *自己* 的数据 ★★★
-        // 但由于后端现在还是生成通用数据，我们暂时监听 current_scene
-        // 下一步后端更新后，我们会让后端把数据拆分
-        db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
-            const data = snapshot.val();
-            if(data) {
-                intro.style.opacity = 0; setTimeout(()=>intro.classList.add('hidden'), 1000);
-                // 如果后端支持多视角，这里需要 data[user.uid]，目前先兼容通用版
-                const myData = data[user.uid] || data; 
-                renderScene(myData);
-            }
+            // 监听数据 (支持罗生门视角)
+            db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
+                const data = snapshot.val();
+                if(data) {
+                    // 如果后端返回的是 views 对象，取自己的，否则取通用的
+                    const myData = data[user.uid] || data;
+                    renderScene(myData);
+                }
+            });
         });
     }
 
-    // --- RENDER & THREE-SEGMENT FLOW (恢复三段式) ---
+    // --- 4. RENDER ---
     function renderScene(data) {
         document.getElementById('wait-overlay').classList.add('hidden');
         currentData = data; 
-        currentStage = 0; // 重置阶段
+        currentStage = 0; 
 
         document.getElementById('story-box').innerHTML = "";
         document.getElementById('controls').classList.remove('active');
         document.getElementById('next-trigger').style.display = 'none';
         
-        // Image
         const rawKw = data.image_keyword || "cyberpunk";
         const kw = rawKw.split(' ')[0].replace(/[^a-zA-Z0-9]/g,"");
         const url = `https://loremflickr.com/640/360/cyberpunk,${kw}?random=${Date.now()}`;
         const img = document.getElementById('scene-img'); img.style.opacity=0; img.src=url;
         img.onload = () => { img.style.opacity=0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
 
-        // Step 1: Env (自动)
         addMsg(data.stage_1_env, 'var(--neon-cyan)');
-        
-        // Step 1.5: Show Next Button
-        setTimeout(() => {
-            document.getElementById('next-trigger').style.display = 'block';
-        }, 1000);
+        setTimeout(() => { document.getElementById('next-trigger').style.display = 'block'; }, 1000);
     }
 
-    // 手动推进剧情
     window.advanceFragment = function() {
-        const trigger = document.getElementById('next-trigger');
-        trigger.style.display = 'none'; // Hide button
-
+        document.getElementById('next-trigger').style.display = 'none';
         if (currentStage === 0) {
-            // Show Event
             currentStage = 1;
             addMsg(currentData.stage_2_event, 'var(--neon-pink)');
-            setTimeout(() => trigger.style.display = 'block', 1000); // Show button again
-        } 
-        else if (currentStage === 1) {
-            // Show Analysis & Buttons
+            setTimeout(() => document.getElementById('next-trigger').style.display = 'block', 1000);
+        } else if (currentStage === 1) {
             currentStage = 2;
             addMsg(currentData.stage_3_analysis, 'var(--neon-yellow)');
-            
-            // Update & Unlock Buttons
             document.getElementById('btn-a').innerText = `[A] ${currentData.choices[0].text}`;
             document.getElementById('btn-b').innerText = `[B] ${currentData.choices[1].text}`;
             document.getElementById('controls').classList.add('active');
-            
-            // 滚动到底部
             const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
         }
-    }
-
-    function addMsg(txt, color) {
-        if(!txt) return;
-        const d = document.createElement('div'); 
-        d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
-        document.getElementById('story-box').appendChild(d); 
-        setTimeout(()=>d.classList.add('show'), 50);
-        const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
     }
 
     async function makeChoice(text) {
@@ -401,8 +363,37 @@
         } catch(e) { document.getElementById('wait-overlay').classList.add('hidden'); }
     }
 
+    function addMsg(txt, color) {
+        const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
+        document.getElementById('story-box').appendChild(d); setTimeout(()=>d.classList.add('show'), 50);
+        const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
+    }
+
+    // --- INTRO ANIMATION (YOUR CODE) ---
+    async function playIntroSequence() {
+        const txt = document.getElementById('intro-content');
+        const door = document.getElementById('the-door');
+        document.getElementById('intro-layer').classList.remove('hidden');
+        document.getElementById('intro-layer').style.display = 'flex'; // Ensure flex layout
+        
+        const lines = [
+            "正在初始化神经链路...", "已接入多元宇宙枢纽 (Multiverse Nexus)",
+            "这里是所有现实的交汇点...", "每一扇门，都是一个截然不同的世界。",
+            "正在为你随机锁定一个时空坐标...", "坐标已确认。准备传送。", "祝你好运，行者。"
+        ];
+        const wait = ms => new Promise(r => setTimeout(r, ms));
+        for (let line of lines) {
+            txt.innerText = line; txt.style.opacity = 1; txt.style.transform = "scale(1)";
+            await wait(1800); txt.style.opacity = 0; txt.style.transform = "scale(0.9)"; await wait(400);
+        }
+        txt.style.display = 'none'; door.style.opacity = 1; await wait(500);
+        door.classList.add('zoom-effect'); await wait(2000);
+        document.getElementById('intro-layer').style.opacity = 0;
+        setTimeout(()=>document.getElementById('intro-layer').classList.add('hidden'), 1000);
+        return true;
+    }
+
     function initParticles(){const c=document.getElementById('canvas-container');if(!c)return;const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);const cam=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,1,1000);cam.position.z=100;const r=new THREE.WebGLRenderer({alpha:true});r.setSize(window.innerWidth,window.innerHeight);c.innerHTML='';c.appendChild(r.domElement);const g=new THREE.BufferGeometry();const v=[],cl=[];for(let i=0;i<1500;i++){v.push((Math.random()-0.5)*400,(Math.random()-0.5)*400,(Math.random()-0.5)*400);const c=[0x00f3ff,0xbc13fe,0xff0055][Math.floor(Math.random()*3)];const hc=new THREE.Color(c);cl.push(hc.r,hc.g,hc.b);}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));const m=new THREE.PointsMaterial({size:2,vertexColors:true,opacity:0.7,transparent:true});const p=new THREE.Points(g,m);s.add(p);const a=()=>{requestAnimationFrame(a);p.rotation.x+=0.0005;r.render(s,cam);};a();window.addEventListener('resize',()=>{cam.aspect=window.innerWidth/window.innerHeight;cam.updateProjectionMatrix();r.setSize(window.innerWidth,window.innerHeight);});}
-    async function playIntroSequence(){const i=document.getElementById('intro-layer');i.classList.remove('hidden');i.style.opacity=1;}
 </script>
 </body>
 </html>
