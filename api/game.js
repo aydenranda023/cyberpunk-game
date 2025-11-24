@@ -1,20 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import admin from 'firebase-admin';
 
-// --- 初始化 (防炸逻辑) ---
 if (!admin.apps.length) {
     try {
         const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
         const dbUrl = process.env.FIREBASE_DB_URL;
         if (serviceAccountStr && dbUrl) {
             let serviceAccount = JSON.parse(serviceAccountStr);
-            if (serviceAccount.private_key) {
-                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-            }
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
-                databaseURL: dbUrl
-            });
+            if (serviceAccount.private_key) serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount), databaseURL: dbUrl });
         }
     } catch (e) { console.error("Firebase Init Error", e); }
 }
@@ -23,101 +17,109 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
-    if (!admin.apps.length) return res.status(500).json({ error: "Database Connection Failed" });
-    
+    if (!admin.apps.length) return res.status(500).json({ error: "DB Connect Fail" });
     const db = admin.database();
-    // 注意：这里解构出了 userProfile
     const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
-        // --- 1. 创建房间 (带房主档案) ---
+        // 创建 & 加入 (保持不变)
         if (action === 'CREATE_ROOM') {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
-            
             await db.ref('rooms/' + newRoomId).set({
                 created_at: admin.database.ServerValue.TIMESTAMP,
-                status: 'SOLO', 
-                turn: 0,
-                players: {},
-                // 关键：把房主信息存这就行，稍后 JOIN 会存更详细的
+                status: 'SOLO', turn: 0, players: {},
                 host_info: userProfile || { name: 'Unknown', role: 'Ghost' }
             });
-            
             return res.status(200).json({ roomId: newRoomId });
         }
 
-        // --- 2. 加入房间 (带玩家档案) ---
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
-            if (!snapshot.exists()) return res.status(404).json({ error: "房间不存在" });
-            
-            // 关键：把前端发来的 userProfile 存入数据库
-            await roomRef.child('players/' + userId).update({
-                joined: true,
-                status: 'READY',
-                choice: null,
-                profile: userProfile // <--- 这里存入了你的黑匣子数据
-            });
-            
+            if (!snapshot.exists()) return res.status(404).json({ error: "Room not found" });
+            await roomRef.child('players/' + userId).update({ joined: true, choice: null, profile: userProfile });
             return res.status(200).json({ success: true });
         }
 
-        // --- 3. 开始游戏 (第一章) ---
-        if (action === 'START_GAME') {
+        // --- 核心修改：生成逻辑 ---
+        if (action === 'START_GAME' || action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             
-            // 读取房主职业，定制开场
-            const pSnap = await roomRef.child(`players/${userId}/profile`).once('value');
-            const role = pSnap.val()?.role || "流浪者";
-            const name = pSnap.val()?.name || "V";
+            // 如果是玩家行动，先记录
+            if (action === 'MAKE_MOVE') {
+                await roomRef.child(`players/${userId}`).update({ choice: choiceText });
+            }
 
-            const prompt = `GAME START. Player is a ${role} named ${name}. Generate the first scene.`;
-            const aiJson = await generateStory(prompt);
-
-            await roomRef.child('current_scene').set(aiJson);
-            await roomRef.update({ status: 'PLAYING' });
-            await roomRef.child('history').set([`[开场] ${aiJson.stage_1_env}`]);
-
-            return res.status(200).json({ status: "STARTED" });
-        }
-
-        // --- 4. 玩家行动 (带身份叙事) ---
-        if (action === 'MAKE_MOVE') {
-            const roomRef = db.ref('rooms/' + roomId);
-            await roomRef.child(`players/${userId}`).update({ choice: choiceText });
-            
+            // 获取房间所有数据
             const snapshot = await roomRef.once('value');
             const roomData = snapshot.val();
             const players = roomData.players || {};
             const playerIds = Object.keys(players);
-            
-            const allReady = playerIds.every(pid => players[pid].choice);
 
-            if (!allReady) return res.status(200).json({ status: "WAITING" });
+            // 检查投票 (START_GAME 特权除外)
+            if (action === 'MAKE_MOVE') {
+                const allReady = playerIds.every(pid => players[pid].choice);
+                if (!allReady) return res.status(200).json({ status: "WAITING" });
+            }
 
-            // 收集动作 + 身份信息
-            let summary = "";
+            // --- 构建“罗生门” Prompt ---
+            const historySnap = await roomRef.child('history').once('value');
+            let historyList = historySnap.val() || [];
+            if (typeof historyList === 'object') historyList = Object.values(historyList);
+            const historyText = historyList.slice(-3).join("\n");
+
+            // 描述每个玩家及其行动
+            let playerContext = "";
             playerIds.forEach(pid => {
                 const p = players[pid];
-                // AI 会看到：[黑客 Neo] 选择了: 攻击
-                summary += `[${p.profile?.role || 'Unknown'} ${p.profile?.name || 'Player'}] 选择了: ${p.choice}; `;
+                const choice = p.choice || "GAME_START";
+                playerContext += `Player ID "${pid}": Role=${p.profile.role}, Name=${p.profile.name}, Action=${choice}.\n`;
             });
 
-            const historySnap = await roomRef.child('history').once('value');
-            const historyList = historySnap.val() || [];
-            // 兼容性处理：把对象转数组
-            let cleanHistory = Array.isArray(historyList) ? historyList : Object.values(historyList);
+            const prompt = `
+            [History]: ${historyText}
+            [Players & Actions]:
+            ${playerContext}
 
-            const prompt = `[History]: ${cleanHistory.slice(-3).join("\n")}\n[Actions]: ${summary}\nContinue story.`;
-            const aiJson = await generateStory(prompt);
-
-            await roomRef.child('current_scene').set(aiJson);
-            await roomRef.child('history').push(`[事件] ${aiJson.stage_2_event}`);
+            GENERATE NEXT SCENE.
             
+            【CRITICAL REQUIREMENT】: You must generate a SEPARATE JSON object for EACH player ID listed above.
+            Each player sees the story from their own 2nd person perspective ("You...").
+            Their choices must be relevant to their own role and situation.
+
+            OUTPUT JSON FORMAT:
+            {
+                "global_event_summary": "One sentence summary of what happened (for history)",
+                "views": {
+                    "PLAYER_ID_GOES_HERE": {
+                        "image_keyword": "noun",
+                        "stage_1_env": "...",
+                        "stage_2_event": "...",
+                        "stage_3_analysis": "...",
+                        "choices": [{"text":"A"},{"text":"B"}]
+                    },
+                    "ANOTHER_PLAYER_ID": { ... }
+                }
+            }
+            `;
+
+            const aiRes = await model.generateContent(prompt);
+            const txt = aiRes.response.text().replace(/```json|```/g, "").trim();
+            const aiJson = JSON.parse(txt);
+
+            // 写入数据库
+            // 注意：现在 current_scene 是一个包含多个 uid key 的对象
+            await roomRef.child('current_scene').set(aiJson.views);
+            
+            // 记录历史 (用 AI 生成的全局总结)
+            await roomRef.child('history').push(`[Event] ${aiJson.global_event_summary}`);
+            
+            // 清空投票
             const updates = {};
             playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
             await roomRef.update(updates);
+            
+            if (action === 'START_GAME') await roomRef.update({ status: 'PLAYING' });
 
             return res.status(200).json({ status: "NEW_TURN" });
         }
@@ -125,20 +127,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Unknown Action" });
 
     } catch (error) {
-        console.error("API Error:", error);
+        console.error(error);
         return res.status(500).json({ error: error.message });
     }
-}
-
-async function generateStory(prompt) {
-    const sysPrompt = `
-    ROLE: Cyberpunk Game Master. LANG: Chinese (Simplified). 
-    FORMAT: JSON ONLY.
-    Structure: { "image_keyword": "noun", "stage_1_env": "100 words", "stage_2_event": "80 words", "stage_3_analysis": "50 words", "choices": [{"text":"A"},{"text":"B"}] }
-    `;
-    try {
-        const result = await model.generateContent(sysPrompt + "\n" + prompt);
-        const txt = result.response.text().replace(/```json|```/g, "").trim();
-        return JSON.parse(txt);
-    } catch (e) { throw new Error("AI生成失败: " + e.message); }
 }
