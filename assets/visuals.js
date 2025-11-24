@@ -1,3 +1,4 @@
+// 暴露给全局 window，确保 main.js 能调用
 window.initParticles = function(){
     const c=document.getElementById('canvas-container');if(!c)return;
     const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);
@@ -20,23 +21,18 @@ window.playIntroSequence = async function() {
     
     layer.classList.remove('hidden');
     layer.style.display = 'flex';
-    layer.style.opacity = 1;
     
-    const lines = [
-        "正在初始化神经链路...", "已接入多元宇宙枢纽 (Multiverse Nexus)",
-        "这里是所有现实的交汇点...", "每一扇门，都是一个截然不同的世界。",
-        "正在为你随机锁定一个时空坐标...", "坐标已确认。准备传送。", "祝你好运，行者。"
-    ];
-    
-    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const lines = ["初始化...", "接入多元宇宙...", "同步率 100%"];
     for (let line of lines) {
         txt.innerText = line; txt.style.opacity = 1; txt.style.transform = "scale(1)";
-        await wait(1800); txt.style.opacity = 0; txt.style.transform = "scale(0.9)"; await wait(400);
+        await new Promise(r => setTimeout(r, 1200));
+        txt.style.opacity = 0; txt.style.transform = "scale(0.9)";
+        await new Promise(r => setTimeout(r, 300));
     }
     
     txt.style.display = 'none'; door.style.opacity = 1; 
     door.classList.add('zoom-effect'); 
-    await wait(2000);
+    await new Promise(r => setTimeout(r, 2000));
     
     layer.style.opacity = 0;
     setTimeout(() => layer.classList.add('hidden'), 1000);
