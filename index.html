@@ -3,81 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // V13.1</title>
+    <title>NEURAL_LINK // V14.0_LOBBY</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        /* 保持样式不变，为节省篇幅省略 CSS，请直接使用 V13.0 的 CSS */
+        /* --- 基础样式复用 --- */
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap');
         :root { --bg-color: #000000; --term-bg: rgba(5, 5, 5, 0.95); --neon-cyan: #00f3ff; --neon-pink: #ff0055; --ui-border: rgba(255, 255, 255, 0.2); --font-title: 'ZCOOL QingKe HuangYou', cursive; --font-body: 'Noto Sans SC', sans-serif; }
         body { margin: 0; background: #000; color: #e0f0ff; font-family: var(--font-body); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
         .vignette { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle, transparent 40%, #000 100%); pointer-events: none; }
-        #terminal { width: 100%; height: 100%; display: flex; flex-direction: column; visibility: hidden; position: relative; z-index: 100; background: var(--term-bg); }
-        .cyber-btn { background: rgba(10, 15, 20, 0.9); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 15px; font-family: var(--font-title); font-size: 1.2rem; width: 100%; margin-bottom: 10px; cursor: pointer; }
+        .scanlines { position: fixed; inset: 0; z-index: 2; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; pointer-events: none; }
         .hidden { display: none !important; }
-        input, textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 15px; width: 100%; box-sizing: border-box; }
-        header { height: 40px; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; background: #111; border-bottom: 1px solid #333; }
+        
+        /* --- UI 组件 --- */
+        .cyber-btn { background: rgba(10, 20, 30, 0.9); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 12px; font-family: var(--font-title); font-size: 1.1rem; width: 100%; margin-bottom: 10px; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
+        .cyber-btn:hover { background: var(--neon-cyan); color: #000; box-shadow: 0 0 15px var(--neon-cyan); }
+        .cyber-btn.secondary { border-color: #555; color: #888; }
+        
+        /* --- ID CARD (身份卡) --- */
+        .id-card { border: 1px solid var(--neon-pink); padding: 15px; margin-bottom: 20px; background: rgba(20, 0, 10, 0.6); width: 100%; max-width: 300px; text-align: left; position: relative; }
+        .id-card::before { content:"IDENTITY"; position:absolute; top:-10px; left:10px; background:#000; padding:0 5px; color:var(--neon-pink); font-size:0.8rem; }
+        .id-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+        .id-label { color: #666; }
+        .id-val { color: #fff; font-weight: bold; }
+
+        /* --- LOBBY LIST --- */
+        #room-list-container { width: 100%; max-width: 400px; max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; background: rgba(0,0,0,0.8); margin-bottom: 20px; }
+        .room-item { border: 1px solid #444; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s; }
+        .room-item:hover { border-color: var(--neon-cyan); background: rgba(0, 243, 255, 0.1); }
+        .room-info { display: flex; flex-direction: column; text-align: left; }
+        .room-host { color: var(--neon-cyan); font-size: 1rem; }
+        .room-status { color: #666; font-size: 0.8rem; }
+        
+        /* SCREENS */
+        #modal, #terminal { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; }
+        #modal { justify-content: center; align-items: center; background: rgba(0,0,0,0.95); }
+        #terminal { background: var(--term-bg); visibility: hidden; }
+        
+        /* Terminal Layout */
+        header { height: 40px; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ui-border); background: #111; }
         #visual-container { height: 30vh; overflow: hidden; position: relative; border-bottom: 1px solid #333; }
         #scene-img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: 0.5s; }
         #content-scroll { flex: 1; overflow-y: auto; padding: 20px; }
-        #controls-area { padding: 20px; background: #111; border-top: 1px solid #333; }
-        #modal { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        .msg-block { margin-bottom: 15px; border-left: 2px solid #555; padding-left: 10px; color: #ccc; opacity: 0; transition: 0.5s; transform: translateY(10px); }
+        .msg-block { margin-bottom: 15px; border-left: 3px solid #555; padding-left: 10px; color: #ccc; opacity: 0; transform: translateY(10px); transition: 0.5s; }
         .msg-block.show { opacity: 1; transform: translateY(0); }
-        .overlay-ui { position: absolute; top:10px; left:10px; z-index:10; text-shadow:0 0 2px black; }
-        /* 等待队友遮罩 */
-        #wait-overlay {
-            position: absolute; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.8); z-index: 200;
-            display: flex; justify-content: center; align-items: center;
-            flex-direction: column; color: var(--neon-cyan); font-family: var(--font-title);
-        }
+        #controls-area { padding: 20px; background: #111; border-top: 1px solid #333; }
+        
+        /* Intro & Overlay */
+        #intro-layer { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); font-family: var(--font-title); font-size: 1.5rem; transition: 1s; }
+        .overlay-ui { position: absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.5); padding:5px; font-size:0.8rem; }
+        #wait-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; color: var(--neon-cyan); }
+        
+        input, textarea { background: #111; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; width: 100%; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div id="canvas-container"></div>
 <div class="vignette"></div>
+<div class="scanlines"></div>
 
-<!-- SETUP -->
+<!-- SETUP & LOBBY -->
 <div id="modal">
-    <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:3rem">NEURAL CLOUD</h1>
+    <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:3rem; margin-bottom:20px">NEURAL NET</h1>
     
-    <div id="step-config">
+    <!-- Step 1: Config -->
+    <div id="step-config" style="width: 300px;">
         <textarea id="config-input" placeholder="粘贴 Firebase Config..." style="height:80px"></textarea>
-        <button class="cyber-btn" onclick="initFirebase()">初始化 (INIT)</button>
+        <button class="cyber-btn" onclick="initFirebase()">初始化系统</button>
     </div>
 
-    <div id="step-lobby" class="hidden" style="width:100%; text-align:center">
-        <p id="my-uid" style="color:#666; font-size:0.8rem; margin-bottom:20px">ID: ...</p>
-        <button class="cyber-btn" onclick="createRoom()">创建位面 (HOST)</button>
-        <p style="margin:10px 0; color:#444">- OR -</p>
-        <input id="room-input" placeholder="输入位面ID (例如 8821)">
-        <button class="cyber-btn" style="border-color:#ff0055; color:#ff0055" onclick="joinRoom()">接入位面 (JOIN)</button>
-    </div>
+    <!-- Step 2: Lobby -->
+    <div id="step-lobby" class="hidden" style="width: 100%; max-width: 400px; text-align: center;">
+        <!-- 身份卡片 -->
+        <div class="id-card">
+            <div class="id-row"><span class="id-label">ID:</span> <span class="id-val" id="card-uid">...</span></div>
+            <div class="id-row"><span class="id-label">代号:</span> <span class="id-val" id="card-name">...</span></div>
+            <div class="id-row"><span class="id-label">职业:</span> <span class="id-val" id="card-role" style="color:var(--neon-yellow)">...</span></div>
+            <div class="id-row"><span class="id-label">HP:</span> <span class="id-val">100%</span></div>
+        </div>
 
-    <div id="step-waiting" class="hidden" style="text-align:center">
-        <h2 id="room-code-disp" style="color:var(--neon-cyan); font-size:4rem; margin:20px 0">....</h2>
-        <p style="color:#888">等待队友接入...</p>
-        <p id="player-count" style="color:var(--neon-cyan)">当前人数: 1</p>
-        <div style="height:20px"></div>
-        <button class="cyber-btn" onclick="firstStart()">启动同步 (START)</button>
+        <!-- 位面列表 -->
+        <div style="text-align:left; color:#666; margin-bottom:5px">▼ 活跃位面 (Active Sessions)</div>
+        <div id="room-list-container">
+            <div style="text-align:center; padding:20px; color:#444">正在扫描信号...</div>
+        </div>
+
+        <button class="cyber-btn" onclick="createSoloGame()">开启单人位面 (START SOLO)</button>
     </div>
 </div>
+
+<!-- INTRO -->
+<div id="intro-layer" class="hidden">正在接入神经链接...</div>
 
 <!-- GAME -->
 <div id="terminal">
     <header>
         <div>ROOM: <span id="hud-room">0000</span></div>
-        <div id="status-text" style="color:var(--neon-cyan)">LIVE</div>
+        <div style="font-size:0.8rem; opacity:0.7">SYNC: <span id="sync-status" style="color:var(--neon-cyan)">OK</span></div>
     </header>
     
     <div id="visual-container">
         <img id="scene-img" src="">
-        <div class="overlay-ui"><span>VISUAL: <span id="loading-hint">STANDBY</span></span></div>
+        <div class="overlay-ui"><span>FEED: <span id="loading-hint">STANDBY</span></span></div>
     </div>
     
     <div id="content-scroll">
@@ -85,13 +116,8 @@
     </div>
     
     <div id="controls-area" style="position:relative">
-        <div id="wait-overlay" class="hidden">
-            <p>等待全员决策...</p>
-            <small style="color:#666">SYNCING DECISIONS</small>
-        </div>
-        
+        <div id="wait-overlay" class="hidden">等待同步...</div>
         <div id="next-trigger" style="text-align:center; padding:10px; color:#888; display:none; border-bottom:1px solid #333" onclick="advanceFragment()">▼ 点击继续 ▼</div>
-        
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px">
             <button id="btn-a" class="cyber-btn" onclick="makeChoice('A')">A</button>
             <button id="btn-b" class="cyber-btn" onclick="makeChoice('B')">B</button>
@@ -101,210 +127,221 @@
 
 <script>
     let db, auth, user;
+    let myProfile = {};
     let currentRoomId = null;
     let currentData = null;
     let currentStage = 0;
 
-    // 1. Init
+    // --- 1. INIT & IDENTITY GEN ---
     function initFirebase() {
         const cfgStr = document.getElementById('config-input').value.trim();
-        if(!cfgStr) return alert("Config Required");
+        if(!cfgStr) return alert("请输入配置");
         try {
-            let clean = cfgStr;
-            if(cfgStr.includes("=")) clean = cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1);
+            let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1) : cfgStr;
             const config = new Function("return " + clean)();
             firebase.initializeApp(config);
             auth = firebase.auth();
             db = firebase.database();
+            
             auth.signInAnonymously().then(u => {
                 user = u.user;
+                generateIdentity(); // 生成身份
                 document.getElementById('step-config').classList.add('hidden');
                 document.getElementById('step-lobby').classList.remove('hidden');
-                document.getElementById('my-uid').innerText = "UID: " + user.uid.slice(0,5);
-                initParticles(); 
+                listenToRooms(); // 开始监听房间列表
+                initParticles();
             });
-        } catch(e) { alert("Config Error"); }
+        } catch(e) { alert("配置解析错误"); }
     }
 
-    // 2. Create Room (修复：创建后立刻加入)
-    async function createRoom() {
-        const btn = document.querySelector('button[onclick="createRoom()"]');
-        btn.innerText = "正在创建..."; btn.disabled = true;
+    function generateIdentity() {
+        const roles = ["黑客 (Netrunner)", "独狼 (Solo)", "街头医生 (Ripperdoc)", "公司特工 (Corp)", "流浪者 (Nomad)"];
+        const names = ["V", "K", "Ghost", "Zero", "Echo", "Neon", "Rat"];
+        
+        myProfile = {
+            uid: user.uid,
+            name: names[Math.floor(Math.random()*names.length)] + "_" + Math.floor(Math.random()*99),
+            role: roles[Math.floor(Math.random()*roles.length)],
+            hp: 100
+        };
+
+        // UI Display
+        document.getElementById('card-uid').innerText = user.uid.slice(0,5);
+        document.getElementById('card-name').innerText = myProfile.name;
+        document.getElementById('card-role').innerText = myProfile.role;
+    }
+
+    // --- 2. LOBBY SYSTEM ---
+    function listenToRooms() {
+        const listRef = db.ref('rooms');
+        // 只显示最近的 10 个房间
+        listRef.limitToLast(10).on('value', snapshot => {
+            const container = document.getElementById('room-list-container');
+            container.innerHTML = "";
+            
+            const rooms = snapshot.val();
+            if(!rooms) {
+                container.innerHTML = "<div style='text-align:center; padding:20px; color:#444'>暂无信号</div>";
+                return;
+            }
+
+            // 遍历并渲染房间
+            Object.keys(rooms).forEach(rid => {
+                const r = rooms[rid];
+                // 只显示 SOLO 状态的房间（可加入）或者自己所在的房间
+                if (r.status === 'SOLO' || (r.players && r.players[user.uid])) {
+                    const div = document.createElement('div');
+                    div.className = 'room-item';
+                    
+                    // 房主信息
+                    const hostInfo = r.host_info || { name: 'Unknown', role: 'Ghost' };
+                    const isMine = r.players && r.players[user.uid];
+                    
+                    div.innerHTML = `
+                        <div class="room-info">
+                            <span class="room-host">[${hostInfo.role}] ${hostInfo.name}</span>
+                            <span class="room-status">ID: ${rid} | ${r.status}</span>
+                        </div>
+                        <div style="color:var(--neon-cyan)">${isMine ? '重连 >' : '加入 >'}</div>
+                    `;
+                    div.onclick = () => joinGame(rid);
+                    container.prepend(div); // 新的在上面
+                }
+            });
+        });
+    }
+
+    // --- 3. GAME ACTIONS ---
+    
+    // 创建单人游戏
+    async function createSoloGame() {
+        const btn = document.querySelector('button[onclick="createSoloGame()"]');
+        btn.innerText = "初始化中..."; btn.disabled = true;
         
         try {
-            // A. 创建房间
+            // 1. Create
             const res = await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'CREATE_ROOM' })
+                body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile })
             });
             const data = await res.json();
-            if(data.error) throw new Error(data.error);
-            
             currentRoomId = data.roomId;
 
-            // B. ★关键修复★：房主必须立刻把自己加入到 players 列表
+            // 2. Join self
             await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid })
+                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile })
             });
 
-            enterWaitingRoom();
-        } catch(e) { alert(e.message); btn.disabled=false; btn.innerText="创建位面"; }
-    }
-
-    // 3. Join Room
-    async function joinRoom() {
-        const rid = document.getElementById('room-input').value;
-        const res = await fetch('/api/game', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'JOIN_ROOM', roomId: rid, userId: user.uid })
-        });
-        if(res.ok) {
-            currentRoomId = rid;
-            // 客机不需要等待房主点开始，直接进入监听状态，如果房主还没开始，只会看到空数据
-            enterGameMode(); 
-        } else { alert("加入失败"); }
-    }
-
-    function enterWaitingRoom() {
-        document.getElementById('step-lobby').classList.add('hidden');
-        document.getElementById('step-waiting').classList.remove('hidden');
-        document.getElementById('room-code-disp').innerText = currentRoomId;
-        
-        // 监听人数
-        db.ref(`rooms/${currentRoomId}/players`).on('value', s => {
-            document.getElementById('player-count').innerText = `当前人数: ${s.numChildren()}`;
-        });
-    }
-
-// 4. First Start (Trigger Initial Scene)
-    async function firstStart() {
-        const btn = document.querySelector('button[onclick="firstStart()"]');
-        btn.innerText = "正在初始化神经连接...";
-        btn.disabled = true;
-
-        try {
-            // ★★★ 核心修复：先进入游戏模式，开始监听数据库 ★★★
-            enterGameMode(); 
-
-            // 然后再发送请求让 AI 生成
+            // 3. Start
+            startTransition();
             await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    action: 'START_GAME', 
-                    roomId: currentRoomId, 
-                    userId: user.uid 
-                })
+                body: JSON.stringify({ action: 'START_GAME', roomId: currentRoomId, userId: user.uid })
             });
-            
-        } catch(e) {
-            alert("启动指令发送失败: " + e.message);
-            // 如果失败了，可能需要刷新页面重来
-            location.reload();
-        }
+
+        } catch(e) { alert(e.message); btn.innerText="开启单人位面"; btn.disabled=false; }
     }
 
-    // 5. Game Mode (Listener)
-    function enterGameMode() {
-        document.getElementById('modal').style.display = 'none';
-        document.getElementById('terminal').style.visibility = 'visible';
-        document.getElementById('hud-room').innerText = currentRoomId;
-
-        // ★核心逻辑★：无论房主还是客机，都只做这一件事：监听数据库
-        db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
-            const data = snapshot.val();
-            if (data) renderScene(data);
-        });
-    }
-
-    // 6. Make Choice (API)
-    async function makeChoice(text) {
-        // 立即锁死自己的界面
-        if(text !== "START_GAME") {
-            document.getElementById('wait-overlay').classList.remove('hidden');
-        }
-
-        const choiceText = (text === "START_GAME") 
-            ? "Game Start" 
-            : (text === 'A' ? document.getElementById('btn-a').innerText : document.getElementById('btn-b').innerText);
-
+    // 加入游戏 (无论是自己的旧房间，还是别人的房间)
+    async function joinGame(rid) {
+        currentRoomId = rid;
         try {
+            // 尝试加入 (后端会处理重复加入)
             const res = await fetch('/api/game', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    action: 'MAKE_MOVE', 
-                    roomId: currentRoomId, 
-                    userId: user.uid,
-                    choiceText: choiceText
-                })
+                body: JSON.stringify({ action: 'JOIN_ROOM', roomId: rid, userId: user.uid, userProfile: myProfile })
             });
-            const data = await res.json();
-            // 如果返回 WAITING，说明队友还没选，保持遮罩
-            // 如果返回 NEW_TURN，说明所有人选完了，Firebase 马上就会更新，renderScene 会自动解开遮罩
-        } catch(e) {
-            console.error(e);
-            alert("通讯故障");
-            document.getElementById('wait-overlay').classList.add('hidden'); // 出错了解锁
-        }
+            
+            if(res.ok) {
+                startTransition(); // 进入监听模式
+            } else {
+                alert("无法接入该位面");
+            }
+        } catch(e) { alert("连接错误"); }
     }
 
-    // 7. Render
-    function renderScene(data) {
-        // 收到新数据，立刻解锁界面
-        document.getElementById('wait-overlay').classList.add('hidden');
+    // 过场动画 + 切换界面
+    function startTransition() {
+        document.getElementById('modal').style.display = 'none';
+        const intro = document.getElementById('intro-layer');
+        intro.classList.remove('hidden');
+        intro.style.opacity = 1;
         
-        currentData = data; 
-        currentStage = 0;
+        // 监听数据库
+        const roomRef = db.ref(`rooms/${currentRoomId}`);
+        
+        // 监听剧情更新
+        roomRef.child('current_scene').on('value', snapshot => {
+            const data = snapshot.val();
+            if(data) {
+                // 数据来了，关闭 Intro，显示游戏
+                intro.style.opacity = 0;
+                setTimeout(()=>intro.classList.add('hidden'), 1000);
+                
+                const term = document.getElementById('terminal');
+                term.style.visibility = 'visible';
+                term.style.opacity = 1;
+                document.getElementById('hud-room').innerText = currentRoomId;
+                
+                renderScene(data);
+            }
+        });
+    }
 
-        // Clean
+    // --- 4. RENDER & PLAY ---
+    // (这部分逻辑与之前一致，只负责显示)
+    
+    async function makeChoice(text) {
+        document.getElementById('wait-overlay').classList.remove('hidden');
+        const choiceText = (text === 'A') ? currentData.choices[0].text : currentData.choices[1].text;
+        
+        await fetch('/api/game', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText })
+        });
+    }
+
+    function renderScene(data) {
+        document.getElementById('wait-overlay').classList.add('hidden');
+        currentData = data; currentStage = 0;
+        
         document.getElementById('story-box').innerHTML = "";
         document.getElementById('next-trigger').style.display = 'none';
         
-        // Image (LoremFlickr Instant)
-        const rawKw = data.image_keyword || "cyberpunk";
+        // Image
+        const rawKw = data.image_keyword || "city";
         const kw = rawKw.split(' ')[0].replace(/[^a-zA-Z0-9]/g,"");
         const url = `https://loremflickr.com/640/360/cyberpunk,${kw}?random=${Date.now()}`;
         const img = document.getElementById('scene-img');
-        img.style.opacity = 0;
-        img.src = url;
-        img.onload = () => {
-            img.style.opacity = 0.8;
-            document.getElementById('loading-hint').innerText = "LIVE FEED";
-        };
+        img.style.opacity = 0; img.src = url;
+        img.onload = () => { img.style.opacity = 0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
 
-        // Text Flow
+        // Text
         const addP = (txt, color) => {
-            const d = document.createElement('div');
-            d.className = "msg-block";
-            d.style.borderLeftColor = color;
-            d.innerText = txt;
+            const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
             document.getElementById('story-box').appendChild(d);
             setTimeout(()=>d.classList.add('show'), 50);
         };
-
-        // Sequence
         addP(data.stage_1_env, 'var(--neon-cyan)');
-        setTimeout(() => {
+        setTimeout(()=>{
             addP(data.stage_2_event, 'var(--neon-pink)');
-            // Show Next button for manual advance or auto? 
-            // Let's Auto advance for multiplayer simplicity
-            setTimeout(() => {
+            setTimeout(()=>{
                 addP(data.stage_3_analysis, 'var(--neon-yellow)');
-                // Update Buttons
                 document.getElementById('btn-a').innerText = `[A] ${data.choices[0].text}`;
                 document.getElementById('btn-b').innerText = `[B] ${data.choices[1].text}`;
-            }, 2000);
-        }, 1500);
+                // Auto scroll
+                const box = document.getElementById('content-scroll'); box.scrollTop = box.scrollHeight;
+            }, 1500);
+        }, 1000);
     }
 
     function initParticles(){const c=document.getElementById('canvas-container');const s=new THREE.Scene();s.fog=new THREE.FogExp2(0,0.001);const cam=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,1,1000);cam.position.z=100;const r=new THREE.WebGLRenderer({alpha:true});r.setSize(window.innerWidth,window.innerHeight);c.appendChild(r.domElement);const g=new THREE.BufferGeometry();const v=[],cl=[];for(let i=0;i<1500;i++){v.push((Math.random()-0.5)*400,(Math.random()-0.5)*400,(Math.random()-0.5)*400);const c=[0x00f3ff,0xbc13fe,0xff0055][Math.floor(Math.random()*3)];const hc=new THREE.Color(c);cl.push(hc.r,hc.g,hc.b);}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));const m=new THREE.PointsMaterial({size:2,vertexColors:true,opacity:0.7,transparent:true});const p=new THREE.Points(g,m);s.add(p);const a=()=>{requestAnimationFrame(a);p.rotation.x+=0.0005;r.render(s,cam);};a();}
 </script>
 </body>
 </html>
-
-
