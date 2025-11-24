@@ -1,15 +1,15 @@
-// assets/main.js - V18.2 FINAL STABLE
+// assets/main.js - V18.3 PARSER FIX
 
 // --- 全局变量 ---
 let db, auth, user;
-let myProfile = null;      // 玩家档案
-let currentRoomId = null;  // 当前房间号
-let currentData = null;    // 当前回合的剧情数据
-let currentStage = 0;      // 阅读阶段: 0=环境, 1=事件, 2=分析
-let preBuffer = { A: null, B: null }; // 预加载缓存
+let myProfile = null;
+let currentRoomId = null;
+let currentData = null;
+let currentStage = 0;
+let preBuffer = { A: null, B: null };
 
 // ============================================================
-// 1. 初始化与鉴权 (Init & Auth)
+// 1. 初始化与鉴权 (增强解析版)
 // ============================================================
 
 window.initApp = function() {
@@ -23,28 +23,27 @@ window.initApp = function() {
     btn.disabled = true;
     
     try {
-        // --- 增强解析逻辑 ---
-        let clean = cfgStr;
-        
-        // 1. 移除 const firebaseConfig = 等前缀
-        clean = clean.replace(/^(const|var|let)\s+\w+\s*=\s*/, '');
-        
-        // 2. 提取最外层的 { ... }
-        const firstBrace = clean.indexOf('{');
-        const lastBrace = clean.lastIndexOf('}');
-        
-        if (firstBrace !== -1 && lastBrace !== -1) {
-            clean = clean.substring(firstBrace, lastBrace + 1);
-        } else {
-            // 如果用户只粘贴了内容没粘贴括号，尝试包一层
-            if (!clean.trim().startsWith('{')) clean = '{' + clean + '}';
+        let cleanStr = cfgStr;
+
+        // 1. 【清洗】如果你不小心复制了HTML标签，去掉它们
+        cleanStr = cleanStr.replace(/<script.*?>/gi, '').replace(/<\/script>/gi, '');
+
+        // 2. 【提取】只找第一个 '{' 和最后一个 '}' 中间的内容
+        const firstOpen = cleanStr.indexOf('{');
+        const lastClose = cleanStr.lastIndexOf('}');
+
+        if (firstOpen === -1 || lastClose === -1) {
+            throw new Error("无法识别配置格式。请确保你复制了包含 { ... } 的代码块。");
         }
 
-        // 3. 移除注释 (//...)
-        clean = clean.replace(/\/\/.*$/mg, '');
-        
-        // 4. 尝试解析 (使用 Function 构造器以兼容非标准 JSON 格式)
-        const config = new Function("return " + clean)();
+        cleanStr = cleanStr.substring(firstOpen, lastClose + 1);
+
+        // 3. 【去噪】移除代码中的注释 (// 及其后面的文字)
+        cleanStr = cleanStr.replace(/\/\/.*$/mg, '');
+
+        // 4. 【解析】使用 Function 构造器解析 JS 对象
+        // console.log("Parsed Config String:", cleanStr); // 调试用
+        const config = new Function("return " + cleanStr)();
         
         // --- Firebase 连接 ---
         btn.innerText = "连接云端...";
@@ -58,28 +57,25 @@ window.initApp = function() {
         auth.signInAnonymously().then(u => {
             user = u.user;
             console.log("登录成功 UID:", user.uid);
-            loadCharacter(); // 下一步：加载角色
-            
-            // 尝试启动特效
+            loadCharacter(); 
             if (window.initParticles) window.initParticles();
-            
         }).catch(e => {
-            console.error("Firebase Auth Error:", e);
-            alert("登录失败: " + e.message + "\n请检查网络连接。");
+            console.error("Auth Error:", e);
+            alert("登录失败: " + e.message + "\n请检查网络。");
             btn.innerText = "初始化 (INIT)";
             btn.disabled = false;
         });
 
     } catch(e) {
         console.error("Config Parse Error:", e);
-        alert("配置解析错误: " + e.message + "\n请确保复制了完整的配置代码。");
+        alert("配置代码解析失败:\n" + e.message + "\n\n建议：只复制 const firebaseConfig = { ... } 这一段，不要复制 script 标签。");
         btn.innerText = "初始化 (INIT)";
         btn.disabled = false;
     }
 }
 
 // ============================================================
-// 2. 角色系统 (Character System)
+// 2. 角色系统
 // ============================================================
 
 function loadCharacter() {
@@ -95,8 +91,8 @@ function loadCharacter() {
             createNewCharacter(); 
         }
     }).catch(e => {
-        alert("数据库连接失败: " + e.message);
-        if(btn) btn.disabled = false;
+        alert("数据库读取失败: " + e.message);
+        if(btn) { btn.innerText = "初始化 (INIT)"; btn.disabled = false; }
     });
 }
 
@@ -128,15 +124,11 @@ function createNewCharacter() {
 }
 
 function renderLobby() {
-    // 填充身份卡
     document.getElementById('card-name').innerText = myProfile.name;
     document.getElementById('card-role').innerText = myProfile.role;
-    
-    // 切换界面
     document.getElementById('step-config').classList.add('hidden');
     document.getElementById('step-lobby').classList.remove('hidden');
     
-    // 监听房间列表
     db.ref('rooms').limitToLast(10).on('value', s => {
         const div = document.getElementById('room-list-container');
         div.innerHTML = "";
@@ -149,13 +141,10 @@ function renderLobby() {
         
         Object.keys(rooms).reverse().forEach(rid => {
             const r = rooms[rid];
-            // 过滤旧数据
             if(!r.host_info) return;
             
             const item = document.createElement('div');
             item.className = 'room-item';
-            
-            // 状态颜色
             let statusColor = r.status === 'SOLO' ? 'var(--neon-green)' : 'var(--neon-yellow)';
             let playerCount = r.players ? Object.keys(r.players).length : 0;
 
@@ -179,13 +168,12 @@ window.deleteCharacter = function() {
 }
 
 // ============================================================
-// 3. 游戏连接与操作 (Game Actions)
+// 3. 游戏操作
 // ============================================================
 
 window.createSoloGame = async function() {
     const btn = document.querySelector('button[onclick="createSoloGame()"]');
     btn.innerText = "建立中..."; btn.disabled = true;
-    
     try {
         const res = await fetch('/api/game', { 
             method: 'POST', 
@@ -196,15 +184,12 @@ window.createSoloGame = async function() {
         if(data.error) throw new Error(data.error);
         
         currentRoomId = data.roomId;
-        
         await fetch('/api/game', { 
             method: 'POST', 
             headers: {'Content-Type': 'application/json'}, 
             body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile }) 
         });
-
         enterWaitingRoom();
-        
     } catch(e) { 
         alert("创建失败: " + e.message);
         btn.innerText = "开启单人位面"; btn.disabled = false;
@@ -214,14 +199,12 @@ window.createSoloGame = async function() {
 window.joinGame = async function(rid) {
     const ridVal = rid || document.getElementById('room-input').value;
     if(!ridVal) return alert("请输入 ID");
-    
     try {
         const res = await fetch('/api/game', { 
             method: 'POST', 
             headers: {'Content-Type': 'application/json'}, 
             body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile }) 
         });
-        
         if(res.ok) { 
             currentRoomId = ridVal; 
             startTransition(); 
@@ -236,17 +219,13 @@ function enterWaitingRoom() {
     document.getElementById('step-lobby').classList.add('hidden');
     document.getElementById('step-waiting').classList.remove('hidden');
     document.getElementById('room-code-disp').innerText = currentRoomId;
-    
     db.ref(`rooms/${currentRoomId}/players`).on('value', s => { 
         document.getElementById('player-count').innerText = `连接数: ${s.numChildren()}`; 
     });
 }
 
 window.firstStart = async function() {
-    // 先切界面监听
     startTransition();
-    
-    // 后台触发生成
     fetch('/api/game', { 
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
@@ -255,39 +234,29 @@ window.firstStart = async function() {
 }
 
 // ============================================================
-// 4. 渲染与交互 (Render & Interact)
+// 4. 渲染与交互
 // ============================================================
 
 function startTransition() {
     document.getElementById('modal').style.display = 'none';
-    
-    // 确保 Intro 函数存在
     if (window.playIntroSequence) {
         window.playIntroSequence().then(setupGameUI);
-    } else {
-        setupGameUI(); // 如果没有动画文件，直接开始
-    }
+    } else { setupGameUI(); }
 }
 
 function setupGameUI() {
     const term = document.getElementById('terminal');
-    term.style.visibility = 'visible'; 
-    term.style.opacity = 1;
-    
-    // HUD 更新
+    term.style.visibility = 'visible'; term.style.opacity = 1;
     document.getElementById('hud-room').innerText = currentRoomId;
     document.getElementById('hud-hp').innerText = myProfile.public.hp;
-    // 安全获取隐藏物品
     const hiddenItem = (myProfile.private && myProfile.private.hidden_items) ? myProfile.private.hidden_items[0] : "无";
     document.getElementById('hud-item-disp').innerText = "物品: " + hiddenItem;
 
-    // 监听剧情 (罗生门视角)
     db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
         const data = snapshot.val();
         if(data) {
-            // ★★★ 核心修复：安全获取数据 ★★★
-            // 先尝试拿 user.uid 的数据，拿不到就拿 Object.values 的第一个（保底）
-            const myData = data[user.uid] || Object.values(data)[0];
+            // 容错：先找自己的ID，找不到找P0/P1，还找不到找values第一个
+            const myData = data[user.uid] || data["P0"] || Object.values(data)[0];
             if (myData) renderScene(myData);
         }
     });
@@ -295,101 +264,60 @@ function setupGameUI() {
 
 function renderScene(data) {
     document.getElementById('wait-overlay').classList.add('hidden');
-    currentData = data; 
-    currentStage = 0;
-
+    currentData = data; currentStage = 0;
     document.getElementById('story-box').innerHTML = "";
     document.getElementById('controls').classList.remove('active');
     document.getElementById('next-trigger').style.display = 'none';
     
-    // 图片加载
     const rawKw = data.image_keyword || "cyberpunk";
     const kw = rawKw.split(' ')[0].replace(/[^a-zA-Z0-9]/g,"");
-    // 添加时间戳防止缓存
     const url = `https://loremflickr.com/640/360/cyberpunk,${kw}?random=${Date.now()}`;
-    
-    const img = document.getElementById('scene-img'); 
-    img.style.opacity=0; 
-    img.src=url;
-    img.onload = () => { 
-        img.style.opacity=0.8; 
-        document.getElementById('loading-hint').innerText = "LIVE"; 
-    };
+    const img = document.getElementById('scene-img'); img.style.opacity=0; img.src=url;
+    img.onload = () => { img.style.opacity=0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
 
-    // 文字段落 1
-    const txt1 = data.stage_1_env || "[数据流干扰...]";
+    // 容错：如果没文字，给个默认
+    const txt1 = data.stage_1_env || (data.txt_1 ? data.txt_1 : "[信号连接中...]");
     addMsg(txt1, 'var(--neon-cyan)');
-    
-    // 延迟显示点击按钮
-    setTimeout(() => { 
-        document.getElementById('next-trigger').style.display = 'block'; 
-    }, 1000);
+    setTimeout(() => { document.getElementById('next-trigger').style.display = 'block'; }, 1000);
 }
 
 window.advanceFragment = function() {
     document.getElementById('next-trigger').style.display = 'none';
-    
-    // 保护逻辑：如果数据没加载好，不允许点
-    if (!currentData) return;
-
     if (currentStage === 0) {
         currentStage = 1;
-        addMsg(currentData.stage_2_event || "...", 'var(--neon-pink)');
+        // 兼容旧格式
+        const txt = currentData.stage_2_event || currentData.txt_2 || "...";
+        addMsg(txt, 'var(--neon-pink)');
         setTimeout(() => document.getElementById('next-trigger').style.display = 'block', 1000);
     } else if (currentStage === 1) {
         currentStage = 2;
-        addMsg(currentData.stage_3_analysis || "...", 'var(--neon-yellow)');
+        const txt = currentData.stage_3_analysis || currentData.txt_3 || "...";
+        addMsg(txt, 'var(--neon-yellow)');
         
-        // 按钮文字
         const tA = currentData.choices?.[0]?.text || "行动 A";
         const tB = currentData.choices?.[1]?.text || "行动 B";
         document.getElementById('btn-a').innerText = `[A] ${tA}`;
         document.getElementById('btn-b').innerText = `[B] ${tB}`;
-        
         document.getElementById('controls').classList.add('active');
-        
-        // 滚动到底部
-        const b = document.getElementById('content-scroll'); 
-        b.scrollTop = b.scrollHeight;
+        const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
     }
 }
 
 window.makeChoice = async function(text) {
-    // 锁屏
     document.getElementById('wait-overlay').classList.remove('hidden');
-    
     const choiceText = (text === 'A') ? currentData.choices[0].text : currentData.choices[1].text;
     try {
-        await fetch('/api/game', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText }) 
-        });
-    } catch(e) { 
-        document.getElementById('wait-overlay').classList.add('hidden'); 
-        alert("提交失败，请重试");
-    }
+        await fetch('/api/game', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText }) });
+    } catch(e) { document.getElementById('wait-overlay').classList.add('hidden'); alert("发送失败"); }
 }
 
 function addMsg(txt, color) {
-    if(!txt) return;
-    
-    const d = document.createElement('div'); 
-    d.className="msg-block"; 
-    d.style.borderLeftColor=color; 
-    // 先不填字，为了打字机效果
-    document.getElementById('story-box').appendChild(d); 
-    setTimeout(()=>d.classList.add('show'), 50);
-    
-    // 打字机效果
+    const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color;
+    document.getElementById('story-box').appendChild(d);
     let i=0;
     function type() {
-        if(i < txt.length) { 
-            d.innerHTML += txt.charAt(i); 
-            i++; 
-            document.getElementById('content-scroll').scrollTop = document.getElementById('content-scroll').scrollHeight;
-            setTimeout(type, 15); 
-        }
+        if(i < txt.length) { d.innerHTML += txt.charAt(i); i++; document.getElementById('content-scroll').scrollTop = 9999; setTimeout(type, 15); }
+        else { d.classList.add('show'); }
     }
     type();
 }
