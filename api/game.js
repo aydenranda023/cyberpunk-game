@@ -1,27 +1,46 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getDb, ServerValue } from './lib/fire_admin.js';
-import { getSystemPrompt } from './lib/prompt_bank.js';
+import admin from 'firebase-admin';
+
+// 1. Firebase 初始化 (防崩溃单例模式)
+if (!admin.apps.length) {
+    try {
+        const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+        const dbUrl = process.env.FIREBASE_DB_URL;
+        if (serviceAccountStr && dbUrl) {
+            let serviceAccount = JSON.parse(serviceAccountStr);
+            // 修复私钥换行符
+            if (serviceAccount.private_key) {
+                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            }
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                databaseURL: dbUrl
+            });
+        }
+    } catch (e) { console.error("Firebase Init Error:", e); }
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
-    try {
-        const db = getDb(); 
-        const { action, roomId, userId, choiceText, userProfile } = req.body;
+    if (!admin.apps.length) return res.status(500).json({ error: "Database Disconnected" });
+    
+    const db = admin.database();
+    const { action, roomId, userId, choiceText, userProfile } = req.body;
 
-        // --- 1. CREATE ---
+    try {
+        // --- 房间管理 ---
         if (action === 'CREATE_ROOM') {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
             await db.ref('rooms/' + newRoomId).set({
-                created_at: ServerValue.TIMESTAMP,
-                status: 'SOLO', turn: 0, players: {},
+                created_at: admin.database.ServerValue.TIMESTAMP,
+                status: 'SOLO', players: {},
                 host_info: userProfile || { name: 'Unknown' }
             });
             return res.status(200).json({ roomId: newRoomId });
         }
 
-        // --- 2. JOIN ---
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
@@ -30,7 +49,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true });
         }
 
-        // --- 3. GENERATE (START & MOVE) ---
+        // --- 剧情生成 (START & MOVE) ---
         if (action === 'START_GAME' || action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             
@@ -41,58 +60,70 @@ export default async function handler(req, res) {
             const players = roomData.players || {};
             const playerIds = Object.keys(players);
 
+            // 投票检查
             if (action === 'MAKE_MOVE') {
                 const allReady = playerIds.every(pid => players[pid].choice);
                 if (!allReady) return res.status(200).json({ status: "WAITING" });
             }
 
-            // Prepare Context
+            // 构建 Prompt
             const historySnap = await roomRef.child('history').once('value');
             let historyList = historySnap.val() || [];
             if (typeof historyList === 'object') historyList = Object.values(historyList);
             
             let playerContext = "";
-            playerIds.forEach(pid => {
+            playerIds.forEach((pid, idx) => {
                 const p = players[pid];
-                // 关键：把真实的 PID 传给 AI，要求 AI 返回时用这个做 Key
-                playerContext += `ID: "${pid}" (Name:${p.profile?.name}, Role:${p.profile?.role}, Action:${p.choice || "Start"})\n`;
+                playerContext += `P${idx} [${p.profile?.role}]: Action=${p.choice||"Start"}\n`;
             });
 
-            // Call AI
-            const prompt = getSystemPrompt(historyList.slice(-3).join("\n"), playerContext);
-            const result = await model.generateContent(prompt);
+            const sysPrompt = `
+            ROLE: Cyberpunk GM. LANG: Chinese Simplified.
+            INPUT: [History]: ${historyList.slice(-3).join("\n")} [Players]: ${playerContext}
+            
+            OUTPUT JSON FORMAT (Strict):
+            {
+                "global_summary": "Summary of event",
+                "views_array": [
+                    {
+                        "image_keyword": "noun",
+                        "stage_1_env": "环境描写(100字)",
+                        "stage_2_event": "事件(80字)",
+                        "stage_3_analysis": "分析(50字)",
+                        "choices": [{"text":"A"},{"text":"B"}]
+                    }
+                ]
+            }
+            IMPORTANT: Provide one view object for EACH player in the input list.
+            `;
+
+            const result = await model.generateContent(sysPrompt);
             const txt = result.response.text().replace(/```json|```/g, "").trim();
             const aiJson = JSON.parse(txt);
 
-            // --- ★★★ 数据清洗与重映射 (The Cleaner) ★★★ ---
-            // 这是为了防止 AI 返回错误的 Key 导致前端无文字
+            // --- ★★★ 数据清洗 (The Cleaner) ★★★ ---
             const finalSceneData = {};
-            const views = aiJson.views || {};
-            
-            // 我们遍历真实的玩家列表，为每个人找数据
-            playerIds.forEach((realPid) => {
-                // 1. 尝试直接获取
-                let view = views[realPid];
+            const rawViews = aiJson.views_array || aiJson.views || [];
+            const viewList = Array.isArray(rawViews) ? rawViews : Object.values(rawViews);
+
+            playerIds.forEach((realPid, index) => {
+                // 容错：如果 AI 生成的数组不够长，复用第一个
+                let v = viewList[index] || viewList[0] || {};
                 
-                // 2. 如果找不到，尝试拿第一个 view 当作保底 (防止白屏)
-                if (!view) view = Object.values(views)[0];
-                
-                // 3. 数据标准化 (防止 AI 用 txt_1 代替 stage_1_env)
-                if (view) {
-                    finalSceneData[realPid] = {
-                        image_keyword: view.image_keyword || "cyberpunk",
-                        stage_1_env: view.stage_1_env || view.env || "环境数据连接中...",
-                        stage_2_event: view.stage_2_event || view.event || "...",
-                        stage_3_analysis: view.stage_3_analysis || view.analysis || "...",
-                        choices: view.choices || [{"text":"继续"},{"text":"观察"}]
-                    };
-                }
+                finalSceneData[realPid] = {
+                    image_keyword: v.image_keyword || "cyberpunk",
+                    // 强力映射：尝试所有可能的键名
+                    stage_1_env: v.stage_1_env || v.txt_1 || v.env || "数据连接中...",
+                    stage_2_event: v.stage_2_event || v.txt_2 || v.event || "...",
+                    stage_3_analysis: v.stage_3_analysis || v.txt_3 || v.analysis || "...",
+                    choices: v.choices || [{"text":"继续"},{"text":"观察"}]
+                };
             });
-            // --------------------------------------------------
 
             await roomRef.child('current_scene').set(finalSceneData);
-            await roomRef.child('history').push(`[Event] ${aiJson.global_summary || "未知"}`);
+            await roomRef.child('history').push(`[Event] ${aiJson.global_summary || "..."}`);
             
+            // 清空投票
             const updates = {};
             playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
             await roomRef.update(updates);
@@ -101,9 +132,7 @@ export default async function handler(req, res) {
 
             return res.status(200).json({ status: "NEW_TURN" });
         }
-
         return res.status(400).json({ error: "Unknown Action" });
-
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: error.message });
