@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import admin from 'firebase-admin';
 
+// 初始化防炸逻辑
 if (!admin.apps.length) {
     try {
         const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ roomId: newRoomId });
         }
 
-        // 2. 加入房间
+        // 2. 加入房间 (带身份)
         if (action === 'JOIN_ROOM') {
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
@@ -42,10 +43,11 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true });
         }
 
-        // 3. 生成剧情 (START 或 MAKE_MOVE)
+        // 3. 生成剧情 (核心逻辑)
         if (action === 'START_GAME' || action === 'MAKE_MOVE') {
             const roomRef = db.ref('rooms/' + roomId);
             
+            // 记录选择
             if (action === 'MAKE_MOVE') {
                 await roomRef.child(`players/${userId}`).update({ choice: choiceText });
             }
@@ -61,19 +63,18 @@ export default async function handler(req, res) {
                 if (!allReady) return res.status(200).json({ status: "WAITING" });
             }
 
-            // --- 准备 Prompt 数据 ---
+            // --- 准备 Prompt ---
             const historySnap = await roomRef.child('history').once('value');
             let historyList = historySnap.val() || [];
             if (typeof historyList === 'object') historyList = Object.values(historyList);
             
-            let context = "";
+            let playerContext = "";
             playerIds.forEach(pid => {
                 const p = players[pid];
                 const choice = p.choice || "进入游戏";
-                // 把玩家的表/里设定传给 AI
-                const publicInfo = JSON.stringify(p.profile?.public || {});
-                const privateInfo = JSON.stringify(p.profile?.private || {});
-                context += `玩家ID(${pid}): 角色[${p.profile?.name}], 职业[${p.profile?.role}]。\n【公开状态】:${publicInfo}\n【秘密状态】:${privateInfo}\n【本轮行动】:${choice}\n\n`;
+                const pub = JSON.stringify(p.profile?.public || {});
+                const priv = JSON.stringify(p.profile?.private || {});
+                playerContext += `玩家ID(${pid}): ${p.profile?.name}[${p.profile?.role}]。\n状态:${pub}\n秘密:${priv}\n本轮行动:${choice}\n\n`;
             });
 
             const sysPrompt = `
@@ -81,25 +82,23 @@ export default async function handler(req, res) {
             
             【绝对规则】
             1. **必须使用中文 (简体) 输出**。严禁使用英文描述剧情。
-            2. 这是一个多视角游戏。你需要为每个玩家分别生成一段属于他视角的剧情（第二人称“你”）。
-            3. 剧情要黑暗、紧张、高科技低生活。
+            2. 剧情风格：高科技、低生活、霓虹、暴力、哲学。
+            3. **罗生门视角**：必须为 output 中的每个玩家 ID 生成独立的视角描述（第二人称“你”）。
             
             【输入信息】
-            [历史剧情]: ${historyList.slice(-3).join("\n")}
-            [当前玩家状态与行动]:
-            ${context}
+            [历史概要]: ${historyList.slice(-3).join("\n")}
+            [玩家列表与行动]:
+            ${playerContext}
 
             【输出要求 JSON】
-            请返回一个 JSON 对象，不要包含 Markdown 标记。
-            结构如下：
             {
-                "global_summary": "一句话概括发生了什么（存入历史）",
+                "global_summary": "一句话概括本轮发生的事件（用于存入历史，中文）",
                 "views": {
                     "玩家ID_1": {
-                        "image_keyword": "提取一个具体的英文名词(noun)用于生成图片",
-                        "stage_1_env": "环境描写(中文, 80字)",
-                        "stage_2_event": "突发事件/遭遇(中文, 80字)",
-                        "stage_3_analysis": "危机分析/心理活动(中文, 50字)",
+                        "image_keyword": "Extraction of a specific visual noun (English)",
+                        "stage_1_env": "环境描写(中文, 100字)",
+                        "stage_2_event": "突发事件(中文, 80字)",
+                        "stage_3_analysis": "分析与后果(中文, 50字)",
                         "choices": [{"text":"选项A(中文)"},{"text":"选项B(中文)"}]
                     },
                     "玩家ID_2": { ...同上... }
@@ -111,6 +110,7 @@ export default async function handler(req, res) {
             const txt = result.response.text().replace(/```json|```/g, "").trim();
             const aiJson = JSON.parse(txt);
 
+            // 写入数据库：views 包含所有人的独立剧本
             await roomRef.child('current_scene').set(aiJson.views);
             await roomRef.child('history').push(`[事件] ${aiJson.global_summary}`);
             
