@@ -173,81 +173,62 @@
     let currentStage = 0;
     let preBuffer = { A: null, B: null };
 
-// --- 1. INIT & AUTH (修复版：带加载反馈和错误捕获) ---
+// --- 1. INIT & AUTH (超级容错版) ---
     function initApp() {
-        const cfgStr = document.getElementById('config-input').value.trim();
+        let cfgStr = document.getElementById('config-input').value.trim();
         const btn = document.querySelector('button[onclick="initApp()"]');
         
         if(!cfgStr) return alert("请粘贴 Firebase 配置代码！");
         
-        // 1. 视觉反馈：告诉用户正在干活
-        btn.innerText = "正在连接云端...";
+        btn.innerText = "正在清洗数据...";
         btn.disabled = true;
 
         try {
-            // 解析配置
-            let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1) : cfgStr;
-            // 移除可能存在的注释，防止解析失败
-            clean = clean.replace(/\/\/.*$/mg, ''); 
+            // --- 步骤 A: 数据清洗 (这是修复的关键) ---
+            
+            // 1. 替换中文引号为英文引号
+            cfgStr = cfgStr.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+            
+            // 2. 移除所有 // 开头的注释
+            cfgStr = cfgStr.replace(/\/\/.*$/mg, '');
+            
+            // 3. 提取 { ... } 中间的内容
+            const start = cfgStr.indexOf('{');
+            const end = cfgStr.lastIndexOf('}');
+            
+            if (start === -1 || end === -1) {
+                throw new Error("未找到有效的 { ... } 对象结构");
+            }
+            
+            const clean = cfgStr.substring(start, end + 1);
+
+            // --- 步骤 B: 连接 ---
             const config = new Function("return " + clean)();
             
-            // 初始化 Firebase
             if (!firebase.apps.length) {
                 firebase.initializeApp(config);
             }
             auth = firebase.auth();
             db = firebase.database();
             
-            // 登录
+            btn.innerText = "正在登录...";
+            
             auth.signInAnonymously()
                 .then(u => {
-                    console.log("登录成功:", u.user.uid);
                     user = u.user;
-                    // 登录成功后，下一步加载角色
-                    loadCharacter(btn); 
+                    loadCharacter(); 
                 })
-                .catch(error => {
-                    // ★★★ 捕获登录错误（比如网络不通） ★★★
-                    console.error(error);
-                    alert("登录失败: " + error.message + "\n请检查网络是否能访问 Google Firebase");
-                    btn.innerText = "初始化 (INIT)";
-                    btn.disabled = false;
+                .catch(err => {
+                    throw new Error("登录失败: " + err.message);
                 });
 
         } catch(e) { 
             console.error(e);
-            alert("配置解析错误: " + e.message + "\n请确保复制了完整的 const firebaseConfig = { ... }"); 
+            alert("配置解析错误: " + e.message + "\n\n解决方法：请回到 Firebase 控制台，重新点击复制按钮，不要手动选中复制。"); 
             btn.innerText = "初始化 (INIT)";
             btn.disabled = false;
         }
     }
-
-    // 加载或创建角色 (增加错误处理)
-    function loadCharacter(btn) {
-        btn.innerText = "正在读取档案...";
-        
-        const userRef = db.ref('users/' + user.uid);
-        userRef.once('value')
-            .then(snapshot => {
-                const val = snapshot.val();
-                if (val && val.profile) {
-                    // 老玩家
-                    myProfile = val.profile;
-                    renderLobby();
-                } else {
-                    // 新玩家
-                    createNewCharacter();
-                }
-                // 成功后，尝试启动特效（如果失败不影响流程）
-                try { initParticles(); } catch(e){}
-            })
-            .catch(err => {
-                alert("数据库读取失败: " + err.message);
-                btn.innerText = "初始化 (INIT)";
-                btn.disabled = false;
-            });
-    }
-
     // --- 2. GAME CONNECT ---
     async function createSoloGame() {
         try {
@@ -400,4 +381,5 @@
 </script>
 </body>
 </html>
+
 
