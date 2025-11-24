@@ -3,24 +3,30 @@ let db, auth, user, myProfile = null;
 let currentRoomId = null;
 let currentData = null;
 let currentStage = 0;
-let preBuffer = { A: null, B: null };
 
-// 将函数挂载到 window 方便 HTML 调用
+// 将函数挂载到 window
 window.initApp = function() {
     const cfgStr = document.getElementById('config-input').value.trim();
+    const btn = document.querySelector('button[onclick="initApp()"]');
     if(!cfgStr) return alert("Config Required");
+    
+    btn.innerText = "连接中..."; btn.disabled = true;
+    
     try {
         let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}')+1) : cfgStr;
+        clean = clean.replace(/\/\/.*$/mg, '');
         const config = new Function("return " + clean)();
-        firebase.initializeApp(config);
+        
+        if(!firebase.apps.length) firebase.initializeApp(config);
         auth = firebase.auth();
         db = firebase.database();
+        
         auth.signInAnonymously().then(u => {
             user = u.user;
             loadCharacter();
-            window.initParticles(); // 调用 visuals.js
-        });
-    } catch(e) { alert("配置错误"); }
+            window.initParticles();
+        }).catch(e => { alert("登录失败"); btn.disabled=false; });
+    } catch(e) { alert("配置错误"); btn.disabled=false; }
 }
 
 function loadCharacter() {
@@ -32,17 +38,11 @@ function loadCharacter() {
 }
 
 function createNewCharacter() {
-    const roles = [
-        { id: "Solo", label: "街头佣兵", hp: 120, items: ["突击步枪"], secret: "被通缉" },
-        { id: "Netrunner", label: "黑客", hp: 80, items: ["接入仓"], secret: "脑数据损坏" },
-        { id: "Doc", label: "义体医生", hp: 90, items: ["急救针"], secret: "黑市交易" }
-    ];
-    const prefixes = ["流浪", "荒坂", "军用", "街头", "夜之城"];
-    const names = ["V", "强尼", "杰克", "露西", "K"];
-    const r = roles[Math.floor(Math.random() * roles.length)];
-    const name = prefixes[Math.floor(Math.random()*prefixes.length)] + "·" + names[Math.floor(Math.random()*names.length)];
+    const roles = [{id:"Solo",label:"佣兵"},{id:"Netrunner",label:"黑客"},{id:"Doc",label:"医生"}];
+    const r = roles[Math.floor(Math.random()*roles.length)];
+    const name = ["V", "强尼", "杰克", "露西", "K"][Math.floor(Math.random()*5)] + "_" + Math.floor(Math.random()*99);
     
-    myProfile = { name: name, role: r.label, public: { hp: r.hp, weapon: r.items[0] }, private: { secret: r.secret, hidden_items: r.items } };
+    myProfile = { name: name, role: r.label, public: { hp: 100, weapon: "普通手枪" }, private: { secret: "..." } };
     db.ref('users/' + user.uid).set({ profile: myProfile });
     renderLobby();
 }
@@ -50,7 +50,6 @@ function createNewCharacter() {
 function renderLobby() {
     document.getElementById('card-name').innerText = myProfile.name;
     document.getElementById('card-role').innerText = myProfile.role;
-    document.getElementById('card-secret').innerText = myProfile.private.secret;
     document.getElementById('step-config').classList.add('hidden');
     document.getElementById('step-lobby').classList.remove('hidden');
     
@@ -112,13 +111,13 @@ function startTransition() {
         
         document.getElementById('hud-name-disp').innerText = myProfile.name;
         document.getElementById('hud-hp-disp').innerText = myProfile.public.hp;
-        document.getElementById('hud-item-disp').innerText = "物品: " + myProfile.private.hidden_items[0];
 
         db.ref(`rooms/${currentRoomId}/current_scene`).on('value', snapshot => {
             const data = snapshot.val();
             if(data) {
-                const myData = data[user.uid] || data;
-                renderScene(myData);
+                // ★★★ 核心：容错获取数据 (关键修复点) ★★★
+                const myData = data[user.uid] || Object.values(data)[0];
+                if (myData) renderScene(myData);
             }
         });
     });
@@ -137,7 +136,10 @@ function renderScene(data) {
     const img = document.getElementById('scene-img'); img.style.opacity=0; img.src=url;
     img.onload = () => { img.style.opacity=0.8; document.getElementById('loading-hint').innerText = "LIVE"; };
 
-    addMsg(data.stage_1_env, 'var(--neon-cyan)');
+    // 容错：如果 stage_1_env 为空，显示默认文本
+    const txt = data.stage_1_env || "环境数据载入中...";
+    addMsg(txt, 'var(--neon-cyan)');
+    
     setTimeout(() => { document.getElementById('next-trigger').style.display = 'block'; }, 1000);
 }
 
@@ -145,13 +147,13 @@ window.advanceFragment = function() {
     document.getElementById('next-trigger').style.display = 'none';
     if (currentStage === 0) {
         currentStage = 1;
-        addMsg(currentData.stage_2_event, 'var(--neon-pink)');
+        addMsg(currentData.stage_2_event || "...", 'var(--neon-pink)');
         setTimeout(() => document.getElementById('next-trigger').style.display = 'block', 1000);
     } else if (currentStage === 1) {
         currentStage = 2;
-        addMsg(currentData.stage_3_analysis, 'var(--neon-yellow)');
-        document.getElementById('btn-a').innerText = `[A] ${currentData.choices[0].text}`;
-        document.getElementById('btn-b').innerText = `[B] ${currentData.choices[1].text}`;
+        addMsg(currentData.stage_3_analysis || "...", 'var(--neon-yellow)');
+        document.getElementById('btn-a').innerText = `[A] ${currentData.choices?.[0]?.text || 'A'}`;
+        document.getElementById('btn-b').innerText = `[B] ${currentData.choices?.[1]?.text || 'B'}`;
         document.getElementById('controls').classList.add('active');
         const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
     }
@@ -166,8 +168,15 @@ window.makeChoice = async function(text) {
 }
 
 function addMsg(txt, color) {
-    if(!txt) return;
-    const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color; d.innerText=txt;
-    document.getElementById('story-box').appendChild(d); setTimeout(()=>d.classList.add('show'), 50);
-    const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
+    const d = document.createElement('div'); d.className="msg-block"; d.style.borderLeftColor=color;
+    document.getElementById('story-box').appendChild(d);
+    
+    // 简单的打字机
+    let i=0;
+    function type() {
+        if(i<txt.length) { d.innerHTML += txt.charAt(i); i++; setTimeout(type, 10); }
+        else { d.classList.add('show'); }
+        const b = document.getElementById('content-scroll'); b.scrollTop = b.scrollHeight;
+    }
+    type();
 }
