@@ -1,44 +1,20 @@
-// Firebase Configuration (Hardcoded)
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+let db, auth, user;
 
-// Auto-Initialize
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const auth = firebase.auth();
-const db = firebase.database();
-
-// Set Persistence to LOCAL
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-let user = null;
-
-export async function signInAnonymously() {
-    if (user) return user;
-    const u = await auth.signInAnonymously();
-    user = u.user;
-    return user;
+export function initFirebase(config) {
+    firebase.initializeApp(config);
+    auth = firebase.auth();
+    db = firebase.database();
 }
 
-export async function getIdToken() {
-    if (!auth.currentUser) return null;
-    return await auth.currentUser.getIdToken(true);
-}
+export function getAuth() { return auth; }
+export function getDb() { return db; }
+export function getUser() { return user; }
 
-export function getUser() {
-    return auth.currentUser;
-}
-
-export function getDb() {
-    return db;
+export function signInAnonymously() {
+    return auth.signInAnonymously().then(u => {
+        user = u.user;
+        return user;
+    });
 }
 
 export function loadUserProfile(uid) {

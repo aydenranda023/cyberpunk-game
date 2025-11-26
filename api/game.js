@@ -22,40 +22,19 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
     if (!admin.apps.length) return res.status(500).json({ error: "DB Connect Fail" });
-
-    // 1. AUTHENTICATION & SECURITY
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: "Unauthorized: Missing Token" });
-    }
-    const idToken = authHeader.split('Bearer ')[1];
-
-    let userId;
-    try {
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        userId = decodedToken.uid;
-    } catch (error) {
-        console.error("Auth Error:", error);
-        return res.status(403).json({ error: "Unauthorized: Invalid Token" });
-    }
-
     const db = admin.database();
-    const { action, roomId, choiceText, userProfile } = req.body; // userId removed from body trust
+    const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
         // 1. 创建房间
         if (action === 'CREATE_ROOM') {
-            const newRoomRef = db.ref('rooms').push();
-            const rid = newRoomRef.key;
-            await newRoomRef.set({
-                created_at: Date.now(),
-                status: 'WAITING',
-                host: userId,
-                host_info: userProfile,
-                turn: 0,
-                last_scene_change: 0
+            const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
+            await db.ref('rooms/' + newRoomId).set({
+                created_at: admin.database.ServerValue.TIMESTAMP,
+                status: 'SOLO', turn: 0, last_scene_change: 0, players: {},
+                host_info: userProfile || { name: '未知', role: 'Ghost' }
             });
-            return res.status(200).json({ roomId: rid });
+            return res.status(200).json({ roomId: newRoomId });
         }
 
         // 2. 加入房间

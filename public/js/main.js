@@ -1,4 +1,4 @@
-import { signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, getUser, getIdToken } from './firebase.js';
+import { initFirebase, signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, getUser, getDb } from './firebase.js';
 import { initParticles, playIntroSequence, playDeathSequence } from './visuals.js';
 
 let myProfile = null;
@@ -7,6 +7,7 @@ let currentData = null;
 let currentStage = 0;
 
 // Expose to window for HTML onclick handlers
+window.initApp = initApp;
 window.createSoloGame = createSoloGame;
 window.joinGame = joinGame;
 window.deleteCharacter = deleteCharacter;
@@ -14,38 +15,25 @@ window.firstStart = firstStart;
 window.advanceFragment = advanceFragment;
 window.makeChoice = makeChoice;
 
-// 0. SECURITY
-async function secureFetch(url, body) {
-    const token = await getIdToken();
-    if (!token) throw new Error("Auth Token Missing");
+// 1. INIT
+function initApp() {
+    const cfgStr = document.getElementById('config-input').value.trim();
+    if (!cfgStr) return alert("Config Required");
+    try {
+        let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}') + 1) : cfgStr;
+        const config = new Function("return " + clean)();
 
-    const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
+        initFirebase(config);
 
-    return fetch(url, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(body)
-    });
+        signInAnonymously().then(() => {
+            loadCharacter();
+            initParticles();
+        });
+    } catch (e) { alert("配置错误"); console.error(e); }
 }
-
-// 1. INIT (Auto)
-document.addEventListener("DOMContentLoaded", () => {
-    initParticles();
-    signInAnonymously().then(() => {
-        loadCharacter();
-        const loadingEl = document.getElementById('init-loading');
-        if (loadingEl) loadingEl.classList.add('hidden');
-    }).catch(e => {
-        alert("Login Failed: " + e.message);
-    });
-});
 
 function loadCharacter() {
     const user = getUser();
-    if (!user) return;
     loadUserProfile(user.uid).then(val => {
         if (val && val.profile) { myProfile = val.profile; renderLobby(); }
         else { createNewCharacter(); }
@@ -74,6 +62,7 @@ function renderLobby() {
     document.getElementById('card-name').innerText = myProfile.name;
     document.getElementById('card-role').innerText = myProfile.role;
     document.getElementById('card-secret').innerText = myProfile.private.secret;
+    document.getElementById('step-config').classList.add('hidden');
     document.getElementById('step-lobby').classList.remove('hidden');
 
     listenToRooms(rooms => {
@@ -103,10 +92,11 @@ function deleteCharacter() {
 // 2. CONNECT & START
 async function createSoloGame() {
     try {
-        const res = await secureFetch('/api/game', { action: 'CREATE_ROOM', userProfile: myProfile });
+        const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile }) });
         const data = await res.json();
         currentRoomId = data.roomId;
-        await secureFetch('/api/game', { action: 'JOIN_ROOM', roomId: currentRoomId, userProfile: myProfile });
+        const user = getUser();
+        await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile }) });
 
         document.getElementById('step-lobby').classList.add('hidden');
         document.getElementById('step-waiting').classList.remove('hidden');
@@ -120,8 +110,9 @@ async function createSoloGame() {
 
 async function joinGame(rid) {
     const ridVal = rid || document.getElementById('room-input').value;
+    const user = getUser();
     try {
-        const res = await secureFetch('/api/game', { action: 'JOIN_ROOM', roomId: ridVal, userProfile: myProfile });
+        const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile }) });
         if (res.ok) { currentRoomId = ridVal; startTransition(); } else alert("无法加入");
     } catch (e) { alert("ERR"); }
 }
@@ -129,7 +120,8 @@ async function joinGame(rid) {
 async function firstStart() {
     startTransition(); // Start intro
     // Trigger AI generation in background
-    secureFetch('/api/game', { action: 'START_GAME', roomId: currentRoomId });
+    const user = getUser();
+    fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'START_GAME', roomId: currentRoomId, userId: user.uid }) });
 }
 
 // 3. INTRO & SYNC
@@ -212,7 +204,8 @@ function renderScene(data) {
     }
 
     // Trigger Preload
-    secureFetch('/api/game', { action: 'PRELOAD_TURN', roomId: currentRoomId });
+    const user = getUser();
+    fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'PRELOAD_TURN', roomId: currentRoomId, userId: user.uid }) });
 }
 
 function advanceFragment() {
@@ -240,8 +233,9 @@ function advanceFragment() {
 async function makeChoice(text) {
     document.getElementById('wait-overlay').classList.remove('hidden');
     const choiceText = (text === 'A') ? currentData.choices[0].text : currentData.choices[1].text;
+    const user = getUser();
     try {
-        await secureFetch('/api/game', { action: 'MAKE_MOVE', roomId: currentRoomId, choiceText: choiceText });
+        await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'MAKE_MOVE', roomId: currentRoomId, userId: user.uid, choiceText: choiceText }) });
     } catch (e) { document.getElementById('wait-overlay').classList.add('hidden'); }
 }
 
