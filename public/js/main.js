@@ -16,21 +16,39 @@ window.advanceFragment = advanceFragment;
 window.makeChoice = makeChoice;
 
 // 1. INIT
+// 1. INIT
+const firebaseConfig = {
+    apiKey: "AIzaSyAcbkxphcJZlWXq3tJvfbb-xkj_i9LpnsU",
+    authDomain: "cyberpunk-game-0529.firebaseapp.com",
+    databaseURL: "https://cyberpunk-game-0529-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "cyberpunk-game-0529",
+    storageBucket: "cyberpunk-game-0529.firebasestorage.app",
+    messagingSenderId: "619803250426",
+    appId: "1:619803250426:web:495f48f5127a67865f0343",
+    measurementId: "G-DCPC4LKNBL"
+};
+
 function initApp() {
-    const cfgStr = document.getElementById('config-input').value.trim();
-    if (!cfgStr) return alert("Config Required");
+    // Auto-init
     try {
-        let clean = cfgStr.includes("=") ? cfgStr.substring(cfgStr.indexOf('{'), cfgStr.lastIndexOf('}') + 1) : cfgStr;
-        const config = new Function("return " + clean)();
+        initFirebase(firebaseConfig);
 
-        initFirebase(config);
+        // Show connecting state
+        document.getElementById('step-config').classList.add('hidden'); // Ensure config is hidden
+        document.getElementById('loading-overlay').classList.remove('hidden'); // Show loading
 
-        signInAnonymously().then(() => {
-            loadCharacter();
-            initParticles();
-        });
-    } catch (e) { alert("配置错误"); console.error(e); }
+        setTimeout(() => {
+            signInAnonymously().then(() => {
+                loadCharacter();
+                initParticles();
+                document.getElementById('loading-overlay').classList.add('hidden');
+            });
+        }, 1000); // 1s delay as requested
+    } catch (e) { alert("Init Error"); console.error(e); }
 }
+
+// Auto-run init on load
+window.addEventListener('DOMContentLoaded', initApp);
 
 function loadCharacter() {
     const user = getUser();
