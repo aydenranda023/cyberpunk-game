@@ -66,3 +66,39 @@ export async function playIntroSequence() {
     setTimeout(() => layer.classList.add('hidden'), 1000);
     return true;
 }
+
+export async function playDeathSequence() {
+    const txt = document.getElementById('intro-content');
+    const layer = document.getElementById('intro-layer');
+    layer.classList.remove('hidden');
+    layer.style.display = 'flex';
+    layer.style.opacity = 1;
+    layer.style.background = '#000'; // Ensure black background
+
+    const lines = [
+        "警告：生命体征危急...",
+        "CRITICAL FAILURE",
+        "神经链路断开...",
+        "SIGNAL LOST",
+        "意识上传失败。",
+        "GAME OVER"
+    ];
+
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    for (let line of lines) {
+        txt.innerText = line;
+        txt.style.color = '#ff0055'; // Red for death
+        txt.style.opacity = 1;
+        txt.style.transform = "scale(1.1)";
+        txt.style.textShadow = "0 0 15px #ff0055";
+
+        await wait(1500);
+        txt.style.opacity = 0;
+        txt.style.transform = "scale(0.9)";
+        await wait(300);
+    }
+
+    await wait(1000);
+    return true;
+}

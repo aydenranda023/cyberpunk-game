@@ -128,30 +128,49 @@ export default async function handler(req, res) {
             // 运行生成逻辑
             const aiJson = await runGameLogic(db, roomId, userId, null, false);
 
-            // 写入
+            // 写入 Scene & History
             await roomRef.child('current_scene').set(aiJson.views);
             await roomRef.child('history').push(`[事件] ${aiJson.global_summary}`);
 
             const updates = {};
-            playerIds.forEach(pid => updates[`players/${pid}/choice`] = null);
+            const updates2 = {}; // For HP and Death
+
+            // Process HP and Death
+            for (const pid of playerIds) {
+                updates[`players/${pid}/choice`] = null;
+
+                const view = aiJson.views[pid];
+                if (view && typeof view.damage_taken === 'number' && view.damage_taken > 0) {
+                    const currentHp = players[pid].profile.public.hp;
+                    let newHp = currentHp - view.damage_taken;
+                    if (newHp < 0) newHp = 0;
+
+                    updates2[`players/${pid}/profile/public/hp`] = newHp;
+
+                    if (newHp <= 0) {
+                        updates2[`players/${pid}/dead`] = true;
+                        // Inject death flag into the view for frontend to react
+                        aiJson.views[pid].is_dead = true;
+                        // Update the view in DB as well so frontend listener gets it
+                        await roomRef.child(`current_scene/${pid}/is_dead`).set(true);
+                    }
+                }
+            }
+
             await roomRef.update(updates);
+            if (Object.keys(updates2).length > 0) await roomRef.update(updates2);
 
             // 更新 Turn 和 SceneChange 计数
             const newTurn = (roomData.turn || 0) + 1;
             const lastChange = roomData.last_scene_change || 0;
-            const updates2 = { turn: newTurn };
+            const updates3 = { turn: newTurn };
 
-            // 如果这次是 Scene Change，更新 last_scene_change
-            // 我们需要知道 runGameLogic 里是否判定了 Scene Change。
-            // 简单起见，我们在 runGameLogic 里重新计算一次 flag 吗？
-            // 或者让 runGameLogic 返回 is_scene_change。
-            // 这里简化：如果 aiJson.views[userId].stage_1_env 不为空，说明换了场景。
             const sampleView = Object.values(aiJson.views)[0];
             if (sampleView && sampleView.stage_1_env) {
-                updates2.last_scene_change = newTurn;
+                updates3.last_scene_change = newTurn;
             }
 
-            await roomRef.update(updates2);
+            await roomRef.update(updates3);
 
             if (action === 'START_GAME') await roomRef.update({ status: 'PLAYING' });
 

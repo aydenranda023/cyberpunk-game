@@ -5,6 +5,7 @@ export const GAME_MASTER_PROMPT = `
             1. **必须使用中文 (简体) 输出**。
             2. 剧情风格：高科技、低生活、霓虹、暴力、哲学。
             3. **罗生门视角**：必须为 output 中的每个玩家 ID 生成独立的视角描述（第二人称“你”）。
+            4. **禁词**：严禁在剧情描述中使用“NPC”一词，请使用具体的身份描述（如“路人”、“店主”、“佣兵”等）。
             
             【输入信息】
             [历史概要]: {{HISTORY}}
@@ -20,8 +21,9 @@ export const GAME_MASTER_PROMPT = `
                         "location": "{{IS_SCENE_CHANGE}} ? '新地点名称(20字内)' : null",
                         "image_keyword": "Visual noun (English)",
                         "stage_1_env": "{{IS_SCENE_CHANGE}} ? '环境描写(50字左右)' : null",
-                        "stage_2_event": "突发事件(80-100字)。必须包含人物对话(玩家间或NPC)。必须承接上轮行动: {{PREV_CHOICE}}。",
+                        "stage_2_event": "突发事件(80-100字)。必须包含人物对话(玩家间或非玩家角色)。必须承接上轮行动: {{PREV_CHOICE}}。",
                         "stage_3_analysis": "分析与后果(50字左右)",
+                        "damage_taken": 0, // 本轮受到的伤害值 (0-30)，根据剧情严重程度决定
                         "choices": [
                             {"text":"激进选项(10字内)"},
                             {"text":"保守选项(10字内)"}
