@@ -16,7 +16,12 @@ export const GAME_MASTER_PROMPT = `
                - 若为 true: 'hp_change' 必须非 0 (例如 -10 或 +5)。根据剧情合理性决定。
                - 若为 false: 'hp_change' 必须严格为 0。
 
-            7. **剧情推进**:
+            7. **物品控制** (Is Item Event: {{IS_ITEM_EVENT}}):
+               - 若为 true: 可以在 'items_change' 中添加获取的新物品 (如 ["+医疗包"])。
+               - 若为 false: 除非剧情中明确消耗了物品，否则 'items_change' 为空。
+               - 玩家死亡或使用物品时，必须在 'items_change' 中移除物品 (如 ["-突击步枪"])。
+
+            8. **剧情推进**:
                - 严禁重复上一轮的信息。
                - 必须推动剧情向前发展，引入新的危机或转折。
             
@@ -24,6 +29,7 @@ export const GAME_MASTER_PROMPT = `
             [历史概要]: {{HISTORY}}
             [场景变更]: {{IS_SCENE_CHANGE}}
             [血量变动]: {{IS_HP_EVENT}}
+            [物品判定]: {{IS_ITEM_EVENT}}
             [玩家列表与行动]:
             {{PLAYER_CONTEXT}}
 
@@ -35,9 +41,10 @@ export const GAME_MASTER_PROMPT = `
                         "location": "{{IS_SCENE_CHANGE}} ? '新地点名称' : null",
                         "image_keyword": "Visual noun (English)",
                         "stage_1_env": "根据规则5填写 (String or null)",
-                        "stage_2_event": "突发事件(80-100字)。必须包含人物对话。必须承接上轮行动: {{PREV_CHOICE}}。",
+                        "stage_2_event": "突发事件(80-100字)。必须包含人物对话。若获得/使用物品请描述。必须承接上轮行动: {{PREV_CHOICE}}。",
                         "stage_3_analysis": "分析与后果(50字左右)",
                         "hp_change": 0, // 根据规则6填写 (Integer)
+                        "items_change": [], // String Array, e.g. ["+ItemName", "-ItemName"]
                         "choices": [
                             {"text":"激进选项(10字内)"},
                             {"text":"保守选项(10字内)"}

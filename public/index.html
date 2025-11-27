@@ -372,19 +372,32 @@
 
         <div id="step-config" class="hidden"></div> <!-- Kept hidden just in case -->
 
-        <input id="room-input" placeholder="位面ID" style="margin:0">
-        <button class="cyber-btn" style="width:auto; margin:0" onclick="joinGame()">加入</button>
-    </div>
-    <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">
-        [重置身份]</div>
-    </div>
+        <div id="step-lobby" class="hidden" style="width:100%; max-width:400px; text-align:center">
+            <!-- 身份卡 -->
+            <div class="id-card">
+                <div class="id-row"><span class="id-val" id="card-name">...</span> <span class="id-val" id="card-role"
+                        style="color:var(--neon-yellow)">...</span></div>
+                <div class="id-row" style="border-top:1px dashed #444; margin-top:5px; padding-top:5px">
+                    <span style="color:#888">绝密:</span> <span id="card-secret" style="color:var(--neon-pink)">...</span>
+                </div>
+            </div>
 
-    <div id="step-waiting" class="hidden" style="text-align:center">
-        <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
-        <p style="color:#888">等待接入...</p>
-        <div id="player-count" style="color:var(--neon-cyan); margin:20px">连接数: 1</div>
-        <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
-    </div>
+            <div id="room-list-container"></div>
+            <button class="cyber-btn" onclick="createSoloGame()">开启单人位面</button>
+            <div style="display:flex; gap:10px">
+                <input id="room-input" placeholder="位面ID" style="margin:0">
+                <button class="cyber-btn" style="width:auto; margin:0" onclick="joinGame()">加入</button>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">
+                [重置身份]</div>
+        </div>
+
+        <div id="step-waiting" class="hidden" style="text-align:center">
+            <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
+            <p style="color:#888">等待接入...</p>
+            <div id="player-count" style="color:var(--neon-cyan); margin:20px">连接数: 1</div>
+            <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
+        </div>
     </div>
 
     <!-- INTRO -->
