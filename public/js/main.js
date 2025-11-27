@@ -60,16 +60,16 @@ function loadCharacter() {
 
 function createNewCharacter() {
     const roles = [
-        { id: "Solo", label: "街头佣兵", hp: 120, items: ["突击步枪", "止痛药"] },
-        { id: "Netrunner", label: "黑客", hp: 80, items: ["接入仓", "光学迷彩"] },
-        { id: "Doc", label: "义体医生", hp: 90, items: ["急救针", "手术刀"] }
+        { id: "Solo", label: "街头佣兵", hp: 120, items: ["突击步枪"], secret: "被通缉" },
+        { id: "Netrunner", label: "黑客", hp: 80, items: ["接入仓"], secret: "脑数据损坏" },
+        { id: "Doc", label: "义体医生", hp: 90, items: ["急救针"], secret: "黑市交易" }
     ];
     const prefixes = ["流浪", "荒坂", "军用", "街头", "夜之城"];
     const names = ["V", "强尼", "杰克", "露西", "K"];
     const r = roles[Math.floor(Math.random() * roles.length)];
     const name = prefixes[Math.floor(Math.random() * prefixes.length)] + "·" + names[Math.floor(Math.random() * names.length)];
 
-    myProfile = { name: name, role: r.label, public: { hp: r.hp, visible_items: r.items }, private: { hidden_items: [] } };
+    myProfile = { name: name, role: r.label, public: { hp: r.hp, weapon: r.items[0] }, private: { secret: r.secret, hidden_items: r.items } };
 
     const user = getUser();
     saveUserProfile(user.uid, myProfile);
@@ -79,11 +79,7 @@ function createNewCharacter() {
 function renderLobby() {
     document.getElementById('card-name').innerText = myProfile.name;
     document.getElementById('card-role').innerText = myProfile.role;
-
-    // Show Items instead of Secret
-    const itemsStr = (myProfile.public.visible_items || []).join(", ");
-    document.getElementById('card-secret').innerText = "装备: " + itemsStr;
-
+    document.getElementById('card-secret').innerText = myProfile.private.secret;
     document.getElementById('step-config').classList.add('hidden');
     document.getElementById('step-lobby').classList.remove('hidden');
 

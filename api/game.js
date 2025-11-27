@@ -16,12 +16,14 @@ if (!admin.apps.length) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Ensure we use a model that supports JSON mode well, or instruct it clearly.
+// flash-lite is fast but might need strict prompting.
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export default async function handler(req, res) {
     if (!admin.apps.length) return res.status(500).json({ error: "DB Connect Fail" });
     const db = admin.database();
-    const { action, roomId, userId, choiceText, userProfile, oldRoomId } = req.body;
+    const { action, roomId, userId, choiceText, userProfile } = req.body;
 
     try {
         // 1. 创建房间
@@ -29,7 +31,7 @@ export default async function handler(req, res) {
             const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
             await db.ref('rooms/' + newRoomId).set({
                 created_at: admin.database.ServerValue.TIMESTAMP,
-                status: 'SOLO', turn: 0, last_scene_change: 0, last_hp_change: 0, players: {},
+                status: 'SOLO', turn: 0, last_scene_change: 0, players: {},
                 host_info: userProfile || { name: '未知', role: 'Ghost' }
             });
             return res.status(200).json({ roomId: newRoomId });
@@ -41,22 +43,11 @@ export default async function handler(req, res) {
             const snapshot = await roomRef.once('value');
             if (!snapshot.exists()) return res.status(404).json({ error: "房间不存在" });
             await roomRef.child('players/' + userId).update({ joined: true, choice: null, profile: userProfile });
-<<<<<<< HEAD
-
-            // Cleanup Old Room
-            if (oldRoomId && oldRoomId !== roomId) {
-                checkAndCleanRoom(db, oldRoomId);
-            }
-
-=======
->>>>>>> parent of bd63e0d (Update game.js)
             return res.status(200).json({ success: true });
         }
 
         // 3. 预加载 (PRELOAD)
         if (action === 'PRELOAD_TURN') {
-<<<<<<< HEAD
-=======
             // 仅在单人或特定策略下有效。这里简单实现：为当前玩家的两个潜在选择预生成。
             // 这是一个后台触发，不阻塞前台。
             // 为了简化，我们只生成一个“通用”的下一章，或者针对 A/B 分别生成。
@@ -65,7 +56,6 @@ export default async function handler(req, res) {
             // 但用户要求“不要选择后再生成”。
             // 让我们并行生成 A 和 B 的结果存入 prebuffer。
 
->>>>>>> parent of bd63e0d (Update game.js)
             const roomRef = db.ref('rooms/' + roomId);
             const snapshot = await roomRef.once('value');
             const roomData = snapshot.val();
@@ -74,14 +64,6 @@ export default async function handler(req, res) {
             const myView = roomData.current_scene[userId];
             if (!myView || !myView.choices) return res.status(200).json({ msg: "No choices found" });
 
-<<<<<<< HEAD
-            const choices = myView.choices;
-
-            const generateForChoice = async (cText) => {
-                return await runGameLogic(db, roomId, userId, cText, true); // true = isPreload
-            };
-
-=======
             const choices = myView.choices; // [{text: "Aggressive"}, {text: "Conservative"}]
 
             // 异步触发生成，不等待? Vercel 函数会杀掉未完成的 promise。必须等待。
@@ -91,16 +73,12 @@ export default async function handler(req, res) {
                 return await runGameLogic(db, roomId, userId, cText, true); // true = isPreload
             };
 
->>>>>>> parent of bd63e0d (Update game.js)
             const [resA, resB] = await Promise.all([
                 generateForChoice(choices[0].text),
                 generateForChoice(choices[1].text)
             ]);
 
-<<<<<<< HEAD
-=======
             // 存入 prebuffer
->>>>>>> parent of bd63e0d (Update game.js)
             await roomRef.child(`prebuffer/${userId}`).set({
                 [choices[0].text]: resA,
                 [choices[1].text]: resB
@@ -118,29 +96,6 @@ export default async function handler(req, res) {
                 const preSnap = await roomRef.child(`prebuffer/${userId}/${choiceText}`).once('value');
                 if (preSnap.exists()) {
                     const preData = preSnap.val();
-<<<<<<< HEAD
-                    await roomRef.child('current_scene').set(preData.views);
-                    await roomRef.child('history').push(`[事件] ${preData.global_summary}`);
-                    await roomRef.child(`players/${userId}`).update({ choice: null });
-                    await roomRef.child(`prebuffer/${userId}`).remove();
-
-                    // Update Turn
-                    await roomRef.child('turn').transaction(t => (t || 0) + 1);
-
-                    // Update Flags from Preload if stored? 
-                    // Preload doesn't store flags in DB, so we might miss updating last_scene_change/last_hp_change.
-                    // Ideally Preload result should include flags and we update DB here.
-                    if (preData._isSceneChange) await roomRef.child('last_scene_change').transaction(t => (t || 0) + 1); // Approximation or set to current turn?
-                    // Actually, Preload is based on "Next Turn". So if we use it, we should update flags based on what Preload decided.
-                    // For simplicity, let's assume Preload data includes flags.
-                    const currentTurn = (await roomRef.child('turn').once('value')).val();
-                    if (preData._isSceneChange) await roomRef.child('last_scene_change').set(currentTurn);
-                    if (preData._isHpEvent) await roomRef.child('last_hp_change').set(currentTurn);
-
-                    return res.status(200).json({ status: "NEW_TURN" });
-                }
-
-=======
                     // 应用预加载的数据
                     await roomRef.child('current_scene').set(preData.views);
                     await roomRef.child('history').push(`[事件] ${preData.global_summary}`);
@@ -157,7 +112,6 @@ export default async function handler(req, res) {
                 }
 
                 // 无 Prebuffer，正常流程
->>>>>>> parent of bd63e0d (Update game.js)
                 await roomRef.child(`players/${userId}`).update({ choice: choiceText });
             }
 
@@ -174,22 +128,14 @@ export default async function handler(req, res) {
             // 运行生成逻辑
             const aiJson = await runGameLogic(db, roomId, userId, null, false);
 
-<<<<<<< HEAD
-=======
             // 写入 Scene & History
->>>>>>> parent of bd63e0d (Update game.js)
             await roomRef.child('current_scene').set(aiJson.views);
             await roomRef.child('history').push(`[事件] ${aiJson.global_summary}`);
 
             const updates = {};
-<<<<<<< HEAD
-            const updates2 = {};
-
-=======
             const updates2 = {}; // For HP and Death
 
             // Process HP and Death
->>>>>>> parent of bd63e0d (Update game.js)
             for (const pid of playerIds) {
                 updates[`players/${pid}/choice`] = null;
 
@@ -198,23 +144,16 @@ export default async function handler(req, res) {
                     const currentHp = players[pid].profile.public.hp || 100;
                     let newHp = currentHp + view.hp_change;
                     if (newHp < 0) newHp = 0;
-<<<<<<< HEAD
-=======
                     // Optional: Cap max HP? For now, let's just keep it simple or cap at 150?
                     // Let's just clamp min 0.
->>>>>>> parent of bd63e0d (Update game.js)
 
                     updates2[`players/${pid}/profile/public/hp`] = newHp;
 
                     if (newHp <= 0) {
                         updates2[`players/${pid}/dead`] = true;
-<<<<<<< HEAD
-                        aiJson.views[pid].is_dead = true;
-=======
                         // Inject death flag into the view for frontend to react
                         aiJson.views[pid].is_dead = true;
                         // Update the view in DB as well so frontend listener gets it
->>>>>>> parent of bd63e0d (Update game.js)
                         await roomRef.child(`current_scene/${pid}/is_dead`).set(true);
                     }
                 }
@@ -223,23 +162,15 @@ export default async function handler(req, res) {
             await roomRef.update(updates);
             if (Object.keys(updates2).length > 0) await roomRef.update(updates2);
 
-<<<<<<< HEAD
-=======
             // 更新 Turn 和 SceneChange 计数
->>>>>>> parent of bd63e0d (Update game.js)
             const newTurn = (roomData.turn || 0) + 1;
             const lastChange = roomData.last_scene_change || 0;
             const updates3 = { turn: newTurn };
 
-<<<<<<< HEAD
-            if (aiJson._isSceneChange) updates3.last_scene_change = newTurn;
-            if (aiJson._isHpEvent) updates3.last_hp_change = newTurn;
-=======
             const sampleView = Object.values(aiJson.views)[0];
             if (sampleView && sampleView.stage_1_env) {
                 updates3.last_scene_change = newTurn;
             }
->>>>>>> parent of bd63e0d (Update game.js)
 
             await roomRef.update(updates3);
 
@@ -256,40 +187,7 @@ export default async function handler(req, res) {
     }
 }
 
-<<<<<<< HEAD
-async function checkAndCleanRoom(db, roomId) {
-    const roomRef = db.ref('rooms/' + roomId);
-    const snap = await roomRef.once('value');
-    if (!snap.exists()) return;
-
-    const roomData = snap.val();
-    const players = roomData.players || {};
-    const playerIds = Object.keys(players);
-
-    if (playerIds.length === 0) {
-        await roomRef.remove();
-        return;
-    }
-
-    let allLeft = true;
-    for (const pid of playerIds) {
-        const userLocSnap = await db.ref(`users/${pid}/current_room`).once('value');
-        const currentRoom = userLocSnap.val();
-        if (currentRoom === roomId) {
-            allLeft = false;
-            break;
-        }
-    }
-
-    if (allLeft) {
-        console.log(`Cleaning up empty room ${roomId}`);
-        await roomRef.remove();
-    }
-}
-
-=======
 // 抽取核心生成逻辑，以便 Preload 复用
->>>>>>> parent of bd63e0d (Update game.js)
 async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
     const roomRef = db.ref('rooms/' + roomId);
     const snapshot = await roomRef.once('value');
@@ -297,24 +195,6 @@ async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
     const players = roomData.players || {};
     const playerIds = Object.keys(players);
 
-<<<<<<< HEAD
-    const turn = roomData.turn || 0;
-    const lastChange = roomData.last_scene_change || 0;
-    const diff = turn - lastChange;
-
-    let isSceneChange = false;
-    if (diff < 3) isSceneChange = false;
-    else if (diff >= 6) isSceneChange = true;
-    else isSceneChange = (Math.random() < 0.3);
-
-    const lastHpChange = roomData.last_hp_change || 0;
-    const diffHp = turn - lastHpChange;
-
-    let isHpEvent = false;
-    if (diffHp < 3) isHpEvent = false;
-    else if (diffHp >= 6) isHpEvent = true;
-    else isHpEvent = (Math.random() < 0.3);
-=======
     // 场景更换逻辑
     const turn = roomData.turn || 0;
     const lastChange = roomData.last_scene_change || 0;
@@ -322,7 +202,6 @@ async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
     // 随机 3-6 回合
     const threshold = 3 + Math.floor(Math.random() * 4);
     const isSceneChange = (diff >= threshold) || (turn === 0);
->>>>>>> parent of bd63e0d (Update game.js)
 
     const historySnap = await roomRef.child('history').once('value');
     let historyList = historySnap.val() || [];
@@ -331,10 +210,7 @@ async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
     let playerContext = "";
     playerIds.forEach(pid => {
         const p = players[pid];
-<<<<<<< HEAD
-=======
         // 如果是 Preload，使用模拟的 choice
->>>>>>> parent of bd63e0d (Update game.js)
         const choice = (isPreload && pid === userId) ? simulatedChoice : (p.choice || "进入游戏");
         const pub = JSON.stringify(p.profile?.public || {});
         const priv = JSON.stringify(p.profile?.private || {});
@@ -344,22 +220,13 @@ async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
     const sysPrompt = GAME_MASTER_PROMPT
         .replace('{{HISTORY}}', historyList.slice(-3).join("\n"))
         .replace('{{IS_SCENE_CHANGE}}', isSceneChange.toString())
-<<<<<<< HEAD
-        .replace('{{IS_HP_EVENT}}', isHpEvent.toString())
-        .replace('{{PLAYER_CONTEXT}}', playerContext)
-        .replace(/{{PREV_CHOICE}}/g, simulatedChoice || "上轮行动");
-=======
         .replace('{{PLAYER_CONTEXT}}', playerContext)
         .replace(/{{PREV_CHOICE}}/g, simulatedChoice || "上轮行动"); // 简单替换
->>>>>>> parent of bd63e0d (Update game.js)
 
     const result = await model.generateContent(sysPrompt);
     const txt = result.response.text();
 
-<<<<<<< HEAD
-=======
     // Robust JSON parsing
->>>>>>> parent of bd63e0d (Update game.js)
     let aiJson;
     try {
         const jsonMatch = txt.match(/\{[\s\S]*\}/);
@@ -370,23 +237,11 @@ async function runGameLogic(db, roomId, userId, simulatedChoice, isPreload) {
         }
     } catch (e) {
         console.error("JSON Parse Error", e);
-<<<<<<< HEAD
-=======
         // Fallback
->>>>>>> parent of bd63e0d (Update game.js)
         return {
             global_summary: "系统错误",
             views: { [userId]: { stage_2_event: "数据链路中断...", choices: [{ text: "重试" }, { text: "等待" }] } }
         };
     }
-<<<<<<< HEAD
-
-    if (aiJson) {
-        aiJson._isSceneChange = isSceneChange;
-        aiJson._isHpEvent = isHpEvent;
-    }
-
-=======
->>>>>>> parent of bd63e0d (Update game.js)
     return aiJson;
 }
