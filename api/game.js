@@ -140,10 +140,12 @@ export default async function handler(req, res) {
                 updates[`players/${pid}/choice`] = null;
 
                 const view = aiJson.views[pid];
-                if (view && typeof view.damage_taken === 'number' && view.damage_taken > 0) {
-                    const currentHp = players[pid].profile.public.hp;
-                    let newHp = currentHp - view.damage_taken;
+                if (view && typeof view.hp_change === 'number') {
+                    const currentHp = players[pid].profile.public.hp || 100;
+                    let newHp = currentHp + view.hp_change;
                     if (newHp < 0) newHp = 0;
+                    // Optional: Cap max HP? For now, let's just keep it simple or cap at 150?
+                    // Let's just clamp min 0.
 
                     updates2[`players/${pid}/profile/public/hp`] = newHp;
 

@@ -14,8 +14,8 @@ window.deleteCharacter = deleteCharacter;
 window.firstStart = firstStart;
 window.advanceFragment = advanceFragment;
 window.makeChoice = makeChoice;
+window.toggleInventory = toggleInventory;
 
-// 1. INIT
 // 1. INIT
 const firebaseConfig = {
     apiKey: "AIzaSyAcbkxphcJZlWXq3tJvfbb-xkj_i9LpnsU",
@@ -107,6 +107,36 @@ function deleteCharacter() {
     }
 }
 
+function toggleInventory() {
+    const modal = document.getElementById('inventory-modal');
+    if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        const list = document.getElementById('inv-list');
+        list.innerHTML = "";
+
+        // Public Items
+        if (myProfile.public.visible_items) {
+            myProfile.public.visible_items.forEach(i => {
+                const div = document.createElement('div');
+                div.innerText = `- ${i}`;
+                div.style.color = "var(--neon-cyan)";
+                list.appendChild(div);
+            });
+        }
+        // Private Items
+        if (myProfile.private.hidden_items) {
+            myProfile.private.hidden_items.forEach(i => {
+                const div = document.createElement('div');
+                div.innerText = `- ${i} (隐藏)`;
+                div.style.color = "var(--neon-pink)";
+                list.appendChild(div);
+            });
+        }
+    } else {
+        modal.classList.add('hidden');
+    }
+}
+
 // 2. CONNECT & START
 async function createSoloGame() {
     try {
@@ -149,9 +179,10 @@ function startTransition() {
     playIntroSequence().then(() => {
         const term = document.getElementById('terminal');
         term.style.visibility = 'visible'; term.style.opacity = 1;
-        document.getElementById('hud-room').innerText = currentRoomId;
+
+        // Update HUD
+        document.getElementById('hud-name').innerText = myProfile.name;
         document.getElementById('hud-hp').innerText = myProfile.public.hp;
-        document.getElementById('hud-item').innerText = myProfile.private.hidden_items[0];
 
         const user = getUser();
         listenToRoomScene(currentRoomId, data => {
@@ -181,20 +212,26 @@ function renderScene(data) {
     }
 
     // Update HP HUD
-    if (data.damage_taken && data.damage_taken > 0) {
-        // Visual Damage Effect
-        document.body.style.boxShadow = "inset 0 0 50px var(--neon-pink)";
-        setTimeout(() => document.body.style.boxShadow = "none", 500);
-
-        // Update local HP display temporarily
+    if (typeof data.hp_change === 'number' && data.hp_change !== 0) {
         const hpEl = document.getElementById('hud-hp');
         let hp = parseInt(hpEl.innerText);
-        hp = Math.max(0, hp - data.damage_taken);
+        hp = Math.max(0, hp + data.hp_change);
         hpEl.innerText = hp;
-        hpEl.style.color = 'var(--neon-pink)';
-        setTimeout(() => hpEl.style.color = 'var(--neon-cyan)', 1000);
 
-        addMsg(`[警告] 受到伤害: -${data.damage_taken}`, 'var(--neon-pink)');
+        if (data.hp_change < 0) {
+            // Damage
+            document.body.style.boxShadow = "inset 0 0 50px var(--neon-pink)";
+            setTimeout(() => document.body.style.boxShadow = "none", 500);
+            hpEl.style.color = 'var(--neon-pink)';
+            addMsg(`[警告] 受到伤害: ${data.hp_change}`, 'var(--neon-pink)');
+        } else {
+            // Heal
+            document.body.style.boxShadow = "inset 0 0 50px var(--neon-cyan)";
+            setTimeout(() => document.body.style.boxShadow = "none", 500);
+            hpEl.style.color = 'var(--neon-cyan)';
+            addMsg(`[系统] 生命恢复: +${data.hp_change}`, 'var(--neon-cyan)');
+        }
+        setTimeout(() => hpEl.style.color = 'var(--neon-cyan)', 1000);
     }
 
     // Image

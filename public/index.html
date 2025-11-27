@@ -409,12 +409,28 @@
     <!-- GAME -->
     <div id="terminal">
         <header>
-            <div>ROOM: <span id="hud-room">0000</span></div>
             <div>
-                HP:<span id="hud-hp" class="hud-val">100</span>
-                ITEM:<span id="hud-item" class="hud-val secret">...</span>
+                <span id="hud-name" style="color:var(--neon-cyan); font-weight:bold; margin-right:10px">PLAYER</span>
+                <span style="font-size:0.8em; color:#666">HP:</span><span id="hud-hp" class="hud-val">100</span>
+            </div>
+            <div>
+                <button id="btn-inventory" class="cyber-btn"
+                    style="width:auto; padding:4px 8px; font-size:0.8rem; margin:0"
+                    onclick="toggleInventory()">物品栏</button>
             </div>
         </header>
+
+        <!-- INVENTORY MODAL -->
+        <div id="inventory-modal" class="hidden"
+            style="position:absolute; top:50px; right:10px; width:200px; background:rgba(0,0,0,0.9); border:1px solid var(--neon-cyan); padding:10px; z-index:60">
+            <h3
+                style="margin:0 0 10px 0; color:var(--neon-cyan); font-size:1rem; border-bottom:1px solid #333; padding-bottom:5px">
+                INVENTORY</h3>
+            <div id="inv-list" style="font-size:0.9rem; color:#ddd; display:flex; flex-direction:column; gap:5px"></div>
+            <div style="margin-top:10px; text-align:right">
+                <span style="cursor:pointer; color:#666; font-size:0.8rem" onclick="toggleInventory()">[CLOSE]</span>
+            </div>
+        </div>
 
         <div id="visual-container">
             <img id="scene-img" src="">

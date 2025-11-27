@@ -23,7 +23,7 @@ export const GAME_MASTER_PROMPT = `
                         "stage_1_env": "{{IS_SCENE_CHANGE}} ? '环境描写(50字左右)' : null",
                         "stage_2_event": "突发事件(80-100字)。必须包含人物对话(玩家间或非玩家角色)。必须承接上轮行动: {{PREV_CHOICE}}。",
                         "stage_3_analysis": "分析与后果(50字左右)",
-                        "damage_taken": 0, // 本轮受到的伤害值 (0-30)，根据剧情严重程度决定
+                        "hp_change": -10, // 必须！本轮血量变化。负数为扣血(伤害)，正数为回血(治疗)。根据决策合理性决定，严禁为0。
                         "choices": [
                             {"text":"激进选项(10字内)"},
                             {"text":"保守选项(10字内)"}
