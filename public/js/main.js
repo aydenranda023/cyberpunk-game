@@ -146,12 +146,9 @@ async function createSoloGame() {
     try {
         const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'CREATE_ROOM', userProfile: myProfile }) });
         const data = await res.json();
-
-        const oldRoomId = currentRoomId; // Capture old room
         currentRoomId = data.roomId;
-
         const user = getUser();
-        await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile, oldRoomId: oldRoomId }) });
+        await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: currentRoomId, userId: user.uid, userProfile: myProfile }) });
 
         document.getElementById('step-lobby').classList.add('hidden');
         document.getElementById('step-waiting').classList.remove('hidden');
@@ -166,9 +163,8 @@ async function createSoloGame() {
 async function joinGame(rid) {
     const ridVal = rid || document.getElementById('room-input').value;
     const user = getUser();
-    const oldRoomId = currentRoomId; // Capture old room
     try {
-        const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile, oldRoomId: oldRoomId }) });
+        const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'JOIN_ROOM', roomId: ridVal, userId: user.uid, userProfile: myProfile }) });
         if (res.ok) { currentRoomId = ridVal; startTransition(); } else alert("无法加入");
     } catch (e) { alert("ERR"); }
 }

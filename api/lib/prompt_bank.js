@@ -5,6 +5,7 @@ export const GAME_MASTER_PROMPT = `
             1. **必须使用中文 (简体) 输出**。
             2. 剧情风格：高科技、低生活、霓虹、暴力、哲学。
             3. **罗生门视角**：必须为 output 中的每个玩家 ID 生成独立的视角描述（第二人称“你”）。
+<<<<<<< HEAD
             4. **禁词**：严禁在剧情描述中使用“NPC”一词，请使用具体的身份描述。
             
             【逻辑控制规则 (CRITICAL)】
@@ -30,6 +31,13 @@ export const GAME_MASTER_PROMPT = `
             [场景变更]: {{IS_SCENE_CHANGE}}
             [血量变动]: {{IS_HP_EVENT}}
             [物品判定]: {{IS_ITEM_EVENT}}
+=======
+            4. **禁词**：严禁在剧情描述中使用“NPC”一词，请使用具体的身份描述（如“路人”、“店主”、“佣兵”等）。
+            
+            【输入信息】
+            [历史概要]: {{HISTORY}}
+            [场景变更]: {{IS_SCENE_CHANGE}} (true=更换新场景/位置, false=保持当前)
+>>>>>>> parent of 898e5a1 (1127)
             [玩家列表与行动]:
             {{PLAYER_CONTEXT}}
 
@@ -38,13 +46,20 @@ export const GAME_MASTER_PROMPT = `
                 "global_summary": "一句话概括本轮发生的事件（用于存入历史，中文）",
                 "views": {
                     "玩家ID_1": {
-                        "location": "{{IS_SCENE_CHANGE}} ? '新地点名称' : null",
+                        "location": "{{IS_SCENE_CHANGE}} ? '新地点名称(20字内)' : null",
                         "image_keyword": "Visual noun (English)",
+<<<<<<< HEAD
                         "stage_1_env": "根据规则5填写 (String or null)",
                         "stage_2_event": "突发事件(80-100字)。必须包含人物对话。若获得/使用物品请描述。必须承接上轮行动: {{PREV_CHOICE}}。",
                         "stage_3_analysis": "分析与后果(50字左右)",
                         "hp_change": 0, // 根据规则6填写 (Integer)
                         "items_change": [], // String Array, e.g. ["+ItemName", "-ItemName"]
+=======
+                        "stage_1_env": "{{IS_SCENE_CHANGE}} ? '环境描写(50字左右)' : null",
+                        "stage_2_event": "突发事件(80-100字)。必须包含人物对话(玩家间或非玩家角色)。必须承接上轮行动: {{PREV_CHOICE}}。",
+                        "stage_3_analysis": "分析与后果(50字左右)",
+                        "hp_change": -10, // 必须！本轮血量变化。负数为扣血(伤害)，正数为回血(治疗)。根据决策合理性决定，严禁为0。
+>>>>>>> parent of 898e5a1 (1127)
                         "choices": [
                             {"text":"激进选项(10字内)"},
                             {"text":"保守选项(10字内)"}
