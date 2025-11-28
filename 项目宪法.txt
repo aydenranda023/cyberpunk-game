@@ -157,13 +157,172 @@ expand_less
 
 表里世界 (Surface & Core)：
 
+📜 PROJECT NEURAL LINK: MASTER CONSTITUTION
+
+项目代号：Neural Link (神经漫游)
+版本：Architecture V1.0 (对应代码 V17)
+
+1. 愿景与核心哲学 (Vision & Philosophy)
+1.1 终极形态 (The North Star)
+
+定义：一个流动的、多人实时生成的叙事宇宙。
+
+体验：玩家既是演员也是导演。游戏即电影，世界随观测者而变。
+
+交互：无缝接入 (Drop-in / Drop-out)。玩家在单人冒险与多人合作/对抗之间自由流动。
+
+演进：目前以“图文”呈现。未来算力提升后，无缝升级为“实时视频/音频流”，实现真正的生成式现实。
+
+1.2 核心设计原则 (Core Principles)
+
+Mobile First (手机优先)：UI 布局、交互方式、资源加载必须优先适配竖屏移动端。
+
+Zero Wait (零等待)：
+
+利用 Intro 动画掩盖初始加载。
+
+利用“文字先行、图片异步”机制掩盖生成延迟。
+
+利用“预加载”机制在阅读当前章时准备下一章。
+
+Database is Truth (数据库即真理)：
+
+取消客户端运算（Host-less）。
+
+所有逻辑判断、状态变更由云端（Vercel）裁决，写入数据库（Firebase）。
+
+客户端只负责“渲染”和“提交意图”。
+
+Rashomon Effect (罗生门视角)：
+
+同一场景，不同玩家看到的描述是主观的、独立的。
+
+避免上帝视角，强化信息不对称博弈。
+
+2. 技术栈 (Tech Stack)
+
+Frontend: HTML5, CSS3 (Cyberpunk/CRT Style), Vanilla JS.
+
+Visuals: Three.js (Particles/Fog), LoremFlickr (Stock Photos with Filters).
+
+Backend: Vercel Serverless Functions (Node.js).
+
+Database: Google Firebase Realtime Database.
+
+AI Core: Google Gemini 2.5 Flash Lite (High speed, JSON mode).
+
+3. 数据结构规范 (Data Schema)
+3.1 用户档案 (Persistent User Profile)
+
+路径: users/{uid}/profile
+用于跨房间、跨周期的角色存储。
+
+code
+JSON
+download
+content_copy
+expand_less
+{
+  "name": "赛博·强尼",
+  "role": "Netrunner", // 职业，影响 AI 叙事倾向
+  "public": {
+    "hp": 100,
+    "appearance": "穿着反光雨衣，义眼闪烁蓝光",
+    "visible_items": ["黑客接入仓"] // 所有人可见
+  },
+  "private": {
+    "sanity": 80, // 理智/精神状态
+    "secret_mission": "背叛队友，窃取数据", // 只有自己可见
+    "hidden_items": ["病毒芯片", "单分子线"]
+  }
+}
+3.2 房间/位面 (Session Room)
+
+路径: rooms/{room_id}
+
+code
+JSON
+download
+content_copy
+expand_less
+{
+  "status": "SOLO | PLAYING",
+  "host_info": { ... }, // 房主简略信息，用于大厅列表展示
+  "players": {
+    "{uid}": {
+      "joined": true,
+      "choice": "A | B | null", // 玩家当前回合的选择
+      "profile": { ... } // 玩家档案的完整副本
+    }
+  },
+  "current_scene": {
+    // 罗生门多视角结构：Key 为玩家 UID
+    "{uid_A}": {
+      "image_keyword": "gun",
+      "stage_1_env": "环境描写...",
+      "stage_2_event": "突发事件...",
+      "stage_3_analysis": "分析...",
+      "choices": [{"text":"..."}, {"text":"..."}]
+    },
+    "{uid_B}": { ... }
+  },
+  "history": ["...", "..."] // 剧情摘要列表，用于 AI 上下文
+}
+4. API 接口规范 (Backend Contract)
+
+Endpoint: POST /api/game
+
+Action	描述	必要参数	AI 介入
+CREATE_ROOM	创建新位面	userProfile	否
+JOIN_ROOM	加入位面	roomId, userId, userProfile	否
+START_GAME	强制开始(第一章)	roomId, userId	是 (Start Prompt)
+MAKE_MOVE	提交决策/推进	roomId, userId, choiceText	是 (Story Prompt)
+
+AI 响应逻辑 (MAKE_MOVE):
+
+后端接收请求，记录 choice。
+
+检查 players 中是否所有人都已 choice != null。
+
+若未齐 -> 返回 {status: "WAITING"}。
+
+若齐了 -> 读取 History + Profiles + Choices -> 调用 Gemini -> 写入 DB -> 返回 {status: "NEW_TURN"}。
+
+5. 代码文件结构 (File Map)
+
+为了未来的模块化重构，我们将遵循以下结构：
+
+code
+Text
+download
+content_copy
+expand_less
+/
+├── package.json             # 依赖管理 (firebase-admin, @google/generative-ai)
+├── vercel.json              # 服务器配置
+│
+├── public/                  # 前端资源
+│   ├── index.html           # UI 骨架 & DOM 操作 (View)
+│   └── js/                  # (未来拆分目标)
+│       ├── main.js          # 启动入口
+│       ├── firebase.js      # DB 监听与同步
+│       └── visuals.js       # Three.js & Intro 动画
+│
+└── api/                     # 后端逻辑
+    ├── game.js              # 核心业务逻辑 (Controller)
+    └── lib/                 # (未来拆分目标)
+        └── prompt_bank.js   # 存放所有 AI 提示词模板
+6. 关键逻辑备忘 (Critical Logic)
+
+表里世界 (Surface & Core)：
+
 AI 必须时刻知晓玩家的 Private 数据，但在生成剧情时，除非玩家触发了特定动作（如掏枪），否则不能将 Private 信息暴露给其他玩家的 View。
 
 状态裁决 (State Arbitration)：
 
 AI 返回的 JSON 未来需包含 updates 字段，用于指示后端修改数据库中的 HP 或 Inventory。
 
-（当前版本尚未实装自动扣血，仅体现在文字描述中，这是下一阶段重点）。
+（当前版本已实装自动扣血：每场景仅限一次变动，由后端严格裁决）。
 
 容错机制 (Fail-safe)：
 
