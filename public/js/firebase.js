@@ -1,42 +1,12 @@
 let db, auth, user;
-
-export function initFirebase(config) {
-    firebase.initializeApp(config);
-    auth = firebase.auth();
-    db = firebase.database();
-}
-
-export function getAuth() { return auth; }
-export function getDb() { return db; }
-export function getUser() { return user; }
-
-export function signInAnonymously() {
-    return auth.signInAnonymously().then(u => {
-        user = u.user;
-        return user;
-    });
-}
-
-export function loadUserProfile(uid) {
-    return db.ref('users/' + uid).once('value').then(s => s.val());
-}
-
-export function saveUserProfile(uid, profile) {
-    return db.ref('users/' + uid).set({ profile: profile });
-}
-
-export function removeUserProfile(uid) {
-    return db.ref('users/' + uid).remove();
-}
-
-export function listenToRooms(callback) {
-    return db.ref('rooms').limitToLast(10).on('value', s => callback(s.val()));
-}
-
-export function listenToRoomPlayers(rid, callback) {
-    return db.ref(`rooms/${rid}/players`).on('value', s => callback(s.numChildren()));
-}
-
-export function listenToRoomScene(rid, callback) {
-    return db.ref(`rooms/${rid}/current_scene`).on('value', s => callback(s.val()));
-}
+export const initFirebase = (cfg) => { firebase.initializeApp(cfg); auth = firebase.auth(); db = firebase.database(); };
+export const getAuth = () => auth;
+export const getDb = () => db;
+export const getUser = () => user;
+export const signInAnonymously = () => auth.signInAnonymously().then(u => (user = u.user));
+export const loadUserProfile = (uid) => db.ref('users/' + uid).once('value').then(s => s.val());
+export const saveUserProfile = (uid, p) => db.ref('users/' + uid).set({ profile: p });
+export const removeUserProfile = (uid) => db.ref('users/' + uid).remove();
+export const listenToRooms = (cb) => db.ref('rooms').limitToLast(10).on('value', s => cb(s.val()));
+export const listenToRoomPlayers = (rid, cb) => db.ref(`rooms/${rid}/players`).on('value', s => cb(s.numChildren()));
+export const listenToRoomScene = (rid, cb) => db.ref(`rooms/${rid}/current_scene`).on('value', s => cb(s.val()));

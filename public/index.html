@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEURAL_LINK // V16.1</title>
+    <title>NEURAL_LINK // V17</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -13,82 +13,76 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap');
 
         :root {
-            --bg-color: #050505;
-            --neon-cyan: #00f3ff;
-            --neon-pink: #ff0055;
-            --neon-yellow: #fcee0a;
-            --font-title: 'ZCOOL QingKe HuangYou', cursive;
-            --font-body: 'Noto Sans SC', sans-serif;
+            --bg: #050505;
+            --cyan: #00f3ff;
+            --pink: #ff0055;
+            --yel: #fcee0a;
+            --font-t: 'ZCOOL QingKe HuangYou';
+            --font-b: 'Noto Sans SC'
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            -webkit-tap-highlight-color: transparent
         }
 
         body {
             margin: 0;
-            background: var(--bg-color);
+            background: var(--bg);
             color: #eee;
-            font-family: var(--font-body);
+            font-family: var(--font-b);
             height: 100vh;
             overflow: hidden;
             display: flex;
-            flex-direction: column;
+            flex-direction: column
         }
 
-        #canvas-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        }
-
-        .vignette {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-            background: radial-gradient(circle, transparent 40%, #000 100%);
-            pointer-events: none;
-        }
-
+        #canvas-container,
+        .vignette,
         .scanlines {
             position: fixed;
             inset: 0;
+            pointer-events: none
+        }
+
+        #canvas-container {
+            z-index: 0
+        }
+
+        .vignette {
+            z-index: 1;
+            background: radial-gradient(circle, transparent 40%, #000 100%)
+        }
+
+        .scanlines {
             z-index: 2;
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.1));
-            background-size: 100% 4px;
-            pointer-events: none;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px
         }
 
         .hidden {
-            display: none !important;
+            display: none !important
         }
 
-        /* UI COMPONENTS */
         .cyber-btn {
             background: rgba(0, 20, 40, 0.9);
-            border: 1px solid var(--neon-cyan);
-            color: var(--neon-cyan);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
             padding: 12px;
-            font-family: var(--font-title);
+            font-family: var(--font-t);
             font-size: 1.1rem;
             width: 100%;
             margin-bottom: 10px;
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            text-transform: uppercase
         }
 
         .cyber-btn:active {
-            background: var(--neon-cyan);
-            color: #000;
+            background: var(--cyan);
+            color: #000
         }
 
-        /* SCREENS */
         #modal {
             position: absolute;
             inset: 0;
@@ -98,42 +92,25 @@
             justify-content: center;
             align-items: center;
             background: rgba(0, 0, 0, 0.95);
-            padding: 20px;
+            padding: 20px
         }
 
-        textarea {
-            background: #111;
-            border: 1px solid var(--neon-cyan);
-            color: var(--neon-cyan);
-            padding: 10px;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        /* ID CARD */
         .id-card {
-            border: 1px solid var(--neon-pink);
+            border: 1px solid var(--pink);
             padding: 15px;
             margin-bottom: 20px;
             background: rgba(20, 0, 10, 0.8);
             width: 100%;
-            max-width: 300px;
-            text-align: left;
+            max-width: 300px
         }
 
         .id-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 5px;
-            font-size: 0.9rem;
+            font-size: 0.9rem
         }
 
-        .id-val {
-            color: #fff;
-            font-weight: bold;
-        }
-
-        /* ROOM LIST */
         #room-list-container {
             width: 100%;
             max-width: 400px;
@@ -141,7 +118,7 @@
             overflow-y: auto;
             border: 1px solid #333;
             margin-bottom: 10px;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.5)
         }
 
         .room-item {
@@ -150,14 +127,13 @@
             display: flex;
             justify-content: space-between;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.9rem
         }
 
         .room-item:hover {
-            background: rgba(0, 243, 255, 0.1);
+            background: rgba(0, 243, 255, 0.1)
         }
 
-        /* GAME UI */
         #terminal {
             position: absolute;
             inset: 0;
@@ -165,27 +141,17 @@
             background: rgba(5, 5, 5, 0.95);
             visibility: hidden;
             display: flex;
-            flex-direction: column;
+            flex-direction: column
         }
 
         header {
             padding: 8px 15px;
-            border-bottom: 1px solid var(--neon-cyan);
+            border-bottom: 1px solid var(--cyan);
             background: #111;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.8rem;
-        }
-
-        .hud-val {
-            color: var(--neon-cyan);
-            font-weight: bold;
-            margin-left: 5px;
-        }
-
-        .hud-val.secret {
-            color: var(--neon-pink);
+            font-size: 0.8rem
         }
 
         #visual-container {
@@ -193,7 +159,7 @@
             overflow: hidden;
             position: relative;
             border-bottom: 1px solid #333;
-            flex-shrink: 0;
+            flex-shrink: 0
         }
 
         #scene-img {
@@ -201,7 +167,7 @@
             height: 100%;
             object-fit: cover;
             opacity: 0;
-            transition: 0.5s;
+            transition: 0.5s
         }
 
         .overlay-ui {
@@ -212,7 +178,7 @@
             background: rgba(0, 0, 0, 0.6);
             padding: 4px 8px;
             font-size: 0.8rem;
-            color: #fff;
+            color: #fff
         }
 
         #content-scroll {
@@ -221,7 +187,7 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 15px
         }
 
         .msg-block {
@@ -232,19 +198,19 @@
             transition: 0.5s;
             font-size: 1rem;
             line-height: 1.6;
-            color: #ddd;
+            color: #ddd
         }
 
         .msg-block.show {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0)
         }
 
         #controls-area {
             padding: 15px;
             background: #111;
             border-top: 1px solid #333;
-            position: relative;
+            position: relative
         }
 
         #next-trigger {
@@ -254,20 +220,18 @@
             cursor: pointer;
             border-bottom: 1px solid #333;
             margin-bottom: 10px;
-            animation: pulse 2s infinite;
+            animation: pulse 2s infinite
         }
 
         @keyframes pulse {
-            0% {
-                opacity: 0.5;
+
+            0%,
+            100% {
+                opacity: 0.5
             }
 
             50% {
-                opacity: 1;
-            }
-
-            100% {
-                opacity: 0.5;
+                opacity: 1
             }
         }
 
@@ -277,15 +241,14 @@
             gap: 10px;
             opacity: 0.3;
             pointer-events: none;
-            transition: 0.3s;
+            transition: 0.3s
         }
 
         #controls.active {
             opacity: 1;
-            pointer-events: all;
+            pointer-events: all
         }
 
-        /* WAIT & INTRO */
         #wait-overlay {
             position: absolute;
             inset: 0;
@@ -294,8 +257,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            color: var(--neon-cyan);
-            font-family: var(--font-title);
+            color: var(--cyan);
+            font-family: var(--font-t)
         }
 
         #intro-layer {
@@ -307,20 +270,20 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            color: var(--neon-cyan);
-            font-family: var(--font-title);
+            color: var(--cyan);
+            font-family: var(--font-t);
             font-size: 1.5rem;
-            transition: 1s;
+            transition: 1s
         }
 
         .intro-text {
             font-size: 1.8rem;
-            text-shadow: 0 0 10px var(--neon-cyan);
+            text-shadow: 0 0 10px var(--cyan);
             margin-bottom: 30px;
             text-align: center;
             padding: 20px;
             opacity: 0;
-            transition: 0.5s;
+            transition: 0.5s
         }
 
         .door-frame {
@@ -330,129 +293,99 @@
             border: 2px solid #fff;
             box-shadow: 0 0 50px #fff;
             opacity: 0;
-            transition: 2s;
+            transition: 2s
         }
 
         .zoom-effect {
-            animation: zoomIn 2.5s forwards ease-in;
+            animation: zoomIn 2.5s forwards ease-in
         }
 
         @keyframes zoomIn {
             0% {
                 transform: scale(1);
-                opacity: 1;
+                opacity: 1
             }
 
             80% {
-                opacity: 1;
+                opacity: 1
             }
 
             100% {
                 transform: scale(60);
-                opacity: 0;
+                opacity: 0
             }
         }
     </style>
 </head>
 
 <body>
-
     <div id="canvas-container"></div>
     <div class="vignette"></div>
     <div class="scanlines"></div>
-
-    <!-- CONFIG & LOBBY -->
     <div id="modal">
-        <h1 style="color:var(--neon-cyan); font-family:var(--font-title); font-size:2.5rem; margin-bottom:10px">NEURAL
-            LINK</h1>
-
+        <h1 style="color:var(--cyan);font-family:var(--font-t);font-size:2.5rem;margin-bottom:10px">NEURAL LINK</h1>
         <div id="loading-overlay" style="text-align:center">
-            <h2 style="color:var(--neon-cyan); animation: pulse 1s infinite">CONNECTING...</h2>
+            <h2 style="color:var(--cyan);animation:pulse 1s infinite">CONNECTING...</h2>
         </div>
-
-        <div id="step-config" class="hidden"></div> <!-- Kept hidden just in case -->
-
-        <div id="step-lobby" class="hidden" style="width:100%; max-width:400px; text-align:center">
-            <!-- 身份卡 -->
+        <div id="step-config" class="hidden"></div>
+        <div id="step-lobby" class="hidden" style="width:100%;max-width:400px;text-align:center">
             <div class="id-card">
                 <div class="id-row"><span class="id-val" id="card-name">...</span> <span class="id-val" id="card-role"
-                        style="color:var(--neon-yellow)">...</span></div>
-                <div class="id-row" style="border-top:1px dashed #444; margin-top:5px; padding-top:5px">
-                    <span style="color:#888">绝密:</span> <span id="card-secret" style="color:var(--neon-pink)">...</span>
-                </div>
+                        style="color:var(--yel)">...</span></div>
+                <div class="id-row" style="border-top:1px dashed #444;margin-top:5px;padding-top:5px"><span
+                        style="color:#888">绝密:</span> <span id="card-secret" style="color:var(--pink)">...</span></div>
             </div>
-
             <div id="room-list-container"></div>
             <button class="cyber-btn" onclick="createSoloGame()">开启单人位面</button>
-            <div style="display:flex; gap:10px">
-                <input id="room-input" placeholder="位面ID" style="margin:0">
-                <button class="cyber-btn" style="width:auto; margin:0" onclick="joinGame()">加入</button>
+            <div style="display:flex;gap:10px"><input id="room-input" placeholder="位面ID" style="margin:0"><button
+                    class="cyber-btn" style="width:auto;margin:0" onclick="joinGame()">加入</button></div>
+            <div style="margin-top:10px;font-size:0.8rem;color:#444;cursor:pointer" onclick="deleteCharacter()">[重置身份]
             </div>
-            <div style="margin-top:10px; font-size:0.8rem; color:#444; cursor:pointer" onclick="deleteCharacter()">
-                [重置身份]</div>
         </div>
-
         <div id="step-waiting" class="hidden" style="text-align:center">
-            <h2 id="room-code-disp" style="color:var(--neon-yellow)">...</h2>
+            <h2 id="room-code-disp" style="color:var(--yel)">...</h2>
             <p style="color:#888">等待接入...</p>
-            <div id="player-count" style="color:var(--neon-cyan); margin:20px">连接数: 1</div>
+            <div id="player-count" style="color:var(--cyan);margin:20px">连接数: 1</div>
             <button class="cyber-btn" onclick="firstStart()">启动 (START)</button>
         </div>
     </div>
-
-    <!-- INTRO -->
     <div id="intro-layer" class="hidden">
         <div id="intro-content" class="intro-text"></div>
         <div id="the-door" class="door-frame"></div>
     </div>
-
-    <!-- GAME -->
     <div id="terminal">
         <header>
-            <div>
-                <span id="hud-name" style="color:var(--neon-cyan); font-weight:bold; margin-right:10px">PLAYER</span>
-                <span style="font-size:0.8em; color:#666">HP:</span><span id="hud-hp" class="hud-val">100</span>
-            </div>
-            <div>
-                <button id="btn-inventory" class="cyber-btn"
-                    style="width:auto; padding:4px 8px; font-size:0.8rem; margin:0"
-                    onclick="toggleInventory()">物品栏</button>
-            </div>
+            <div><span id="hud-name" style="color:var(--cyan);font-weight:bold;margin-right:10px">PLAYER</span><span
+                    style="font-size:0.8em;color:#666">HP:</span><span id="hud-hp"
+                    style="color:var(--cyan);font-weight:bold;margin-left:5px">100</span></div>
+            <div><button id="btn-inventory" class="cyber-btn"
+                    style="width:auto;padding:4px 8px;font-size:0.8rem;margin:0"
+                    onclick="toggleInventory()">物品栏</button></div>
         </header>
-
-        <!-- INVENTORY MODAL -->
         <div id="inventory-modal" class="hidden"
-            style="position:absolute; top:50px; right:10px; width:200px; background:rgba(0,0,0,0.9); border:1px solid var(--neon-cyan); padding:10px; z-index:60">
+            style="position:absolute;top:50px;right:10px;width:200px;background:rgba(0,0,0,0.9);border:1px solid var(--cyan);padding:10px;z-index:60">
             <h3
-                style="margin:0 0 10px 0; color:var(--neon-cyan); font-size:1rem; border-bottom:1px solid #333; padding-bottom:5px">
+                style="margin:0 0 10px 0;color:var(--cyan);font-size:1rem;border-bottom:1px solid #333;padding-bottom:5px">
                 INVENTORY</h3>
-            <div id="inv-list" style="font-size:0.9rem; color:#ddd; display:flex; flex-direction:column; gap:5px"></div>
-            <div style="margin-top:10px; text-align:right">
-                <span style="cursor:pointer; color:#666; font-size:0.8rem" onclick="toggleInventory()">[CLOSE]</span>
-            </div>
+            <div id="inv-list" style="font-size:0.9rem;color:#ddd;display:flex;flex-direction:column;gap:5px"></div>
+            <div style="margin-top:10px;text-align:right"><span style="cursor:pointer;color:#666;font-size:0.8rem"
+                    onclick="toggleInventory()">[CLOSE]</span></div>
         </div>
-
-        <div id="visual-container">
-            <img id="scene-img" src="">
+        <div id="visual-container"><img id="scene-img" src="">
             <div class="overlay-ui"><span>FEED: <span id="loading-hint">STANDBY</span></span></div>
         </div>
-
         <div id="content-scroll">
             <div id="story-box"></div>
         </div>
-
         <div id="controls-area">
             <div id="wait-overlay" class="hidden">
                 <p>等待决策同步...</p>
             </div>
             <div id="next-trigger" onclick="advanceFragment()">▼ 点击继续剧情 ▼</div>
-            <div id="controls">
-                <button id="btn-a" class="cyber-btn" onclick="makeChoice('A')">A</button>
-                <button id="btn-b" class="cyber-btn" onclick="makeChoice('B')">B</button>
-            </div>
+            <div id="controls"><button id="btn-a" class="cyber-btn" onclick="makeChoice('A')">A</button><button
+                    id="btn-b" class="cyber-btn" onclick="makeChoice('B')">B</button></div>
         </div>
     </div>
-
     <script type="module" src="js/main.js"></script>
 </body>
 

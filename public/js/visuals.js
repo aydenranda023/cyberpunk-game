@@ -1,104 +1,43 @@
 export function initParticles() {
     const c = document.getElementById('canvas-container');
     if (!c) return;
-    const s = new THREE.Scene();
-    s.fog = new THREE.FogExp2(0, 0.001);
-    const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-    cam.position.z = 100;
-    const r = new THREE.WebGLRenderer({ alpha: true });
-    r.setSize(window.innerWidth, window.innerHeight);
-    c.innerHTML = '';
-    c.appendChild(r.domElement);
-    const g = new THREE.BufferGeometry();
-    const v = [], cl = [];
+    const s = new THREE.Scene(); s.fog = new THREE.FogExp2(0, 0.001);
+    const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000); cam.position.z = 100;
+    const r = new THREE.WebGLRenderer({ alpha: true }); r.setSize(window.innerWidth, window.innerHeight);
+    c.innerHTML = ''; c.appendChild(r.domElement);
+    const pts = []; const cols = [];
     for (let i = 0; i < 1500; i++) {
-        v.push((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400);
-        const c = [0x00f3ff, 0xbc13fe, 0xff0055][Math.floor(Math.random() * 3)];
-        const hc = new THREE.Color(c);
-        cl.push(hc.r, hc.g, hc.b);
+        pts.push((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400);
+        const col = new THREE.Color([0x00f3ff, 0xbc13fe, 0xff0055][Math.floor(Math.random() * 3)]);
+        cols.push(col.r, col.g, col.b);
     }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3));
-    const m = new THREE.PointsMaterial({ size: 2, vertexColors: true, opacity: 0.7, transparent: true });
-    const p = new THREE.Points(g, m);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, vertexColors: true, opacity: 0.7, transparent: true }));
     s.add(p);
-    const a = () => {
-        requestAnimationFrame(a);
-        p.rotation.x += 0.0005;
-        r.render(s, cam);
-    };
-    a();
-    window.addEventListener('resize', () => {
-        cam.aspect = window.innerWidth / window.innerHeight;
-        cam.updateProjectionMatrix();
-        r.setSize(window.innerWidth, window.innerHeight);
-    });
+    const anim = () => { requestAnimationFrame(anim); p.rotation.x += 0.0005; r.render(s, cam); }; anim();
+    window.onresize = () => { cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix(); r.setSize(window.innerWidth, window.innerHeight); };
 }
 
+const wait = ms => new Promise(r => setTimeout(r, ms));
 export async function playIntroSequence() {
-    const txt = document.getElementById('intro-content');
-    const door = document.getElementById('the-door');
-    const layer = document.getElementById('intro-layer');
-    layer.classList.remove('hidden');
-    layer.style.display = 'flex';
-
-    const lines = [
-        "正在初始化神经链路...", "已接入多元宇宙枢纽 (Multiverse Nexus)",
-        "这里是所有现实的交汇点...", "每一扇门，都是一个截然不同的世界。",
-        "正在为你随机锁定一个时空坐标...", "坐标已确认。准备传送。", "祝你好运，行者。"
-    ];
-
-    const wait = ms => new Promise(r => setTimeout(r, ms));
-    for (let line of lines) {
-        txt.innerText = line;
-        txt.style.opacity = 1;
-        txt.style.transform = "scale(1)";
-        await wait(1800);
-        txt.style.opacity = 0;
-        txt.style.transform = "scale(0.9)";
-        await wait(400);
+    const t = document.getElementById('intro-content'), d = document.getElementById('the-door'), l = document.getElementById('intro-layer');
+    l.classList.remove('hidden'); l.style.display = 'flex';
+    for (let txt of ["初始化...", "接入多元宇宙...", "锁定时空...", "传送启动。"]) {
+        t.innerText = txt; t.style.opacity = 1; t.style.transform = "scale(1)";
+        await wait(1500); t.style.opacity = 0; t.style.transform = "scale(0.9)"; await wait(300);
     }
-    txt.style.display = 'none';
-    door.style.opacity = 1;
-    door.classList.add('zoom-effect');
-    await wait(2000);
-    layer.style.opacity = 0;
-    setTimeout(() => layer.classList.add('hidden'), 1000);
-    return true;
+    t.style.display = 'none'; d.style.opacity = 1; d.classList.add('zoom-effect');
+    await wait(2000); l.style.opacity = 0; setTimeout(() => l.classList.add('hidden'), 1000);
 }
 
 export async function playDeathSequence() {
-    const txt = document.getElementById('intro-content');
-    const layer = document.getElementById('intro-layer');
-    layer.classList.remove('hidden');
-    layer.style.display = 'flex';
-    layer.style.opacity = 1;
-    layer.style.background = '#000'; // Ensure black background
-
-    const lines = [
-        "警告：生命体征危急...",
-        "CRITICAL FAILURE",
-        "神经链路断开...",
-        "SIGNAL LOST",
-        "意识上传失败。",
-        "GAME OVER"
-    ];
-
-    const wait = ms => new Promise(r => setTimeout(r, ms));
-
-    for (let line of lines) {
-        txt.innerText = line;
-        txt.style.color = '#ff0055'; // Red for death
-        txt.style.opacity = 1;
-        txt.style.transform = "scale(1.1)";
-        txt.style.textShadow = "0 0 15px #ff0055";
-
-        await wait(1500);
-        txt.style.opacity = 0;
-        txt.style.transform = "scale(0.9)";
-        await wait(300);
+    const t = document.getElementById('intro-content'), l = document.getElementById('intro-layer');
+    l.classList.remove('hidden'); l.style.display = 'flex'; l.style.opacity = 1; l.style.background = '#000';
+    for (let txt of ["生命体征危急...", "CRITICAL FAILURE", "GAME OVER"]) {
+        t.innerText = txt; t.style.color = '#ff0055'; t.style.opacity = 1; t.style.transform = "scale(1.1)";
+        await wait(1500); t.style.opacity = 0; t.style.transform = "scale(0.9)"; await wait(300);
     }
-
     await wait(1000);
-    return true;
 }
