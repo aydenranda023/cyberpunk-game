@@ -4,7 +4,7 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 2.风格:赛博朋克。
 3.罗生门:每人独立视角。
 6.4.禁词:NPC。
-7.HP:每场景随机一回合变动。
+7.HP:每场景(3-6回合)仅一次变动。
 【输入】
 [历史]:{{HISTORY}}
 [换场]:{{IS_SCENE_CHANGE}}
