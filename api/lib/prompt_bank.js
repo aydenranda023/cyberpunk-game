@@ -16,7 +16,7 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 "location":"{{IS_SCENE_CHANGE}}?'新地点':null",
 "image_keyword":"Visual noun(English)",
 "stage_1_env":"{{IS_SCENE_CHANGE}}?'环境':null",
-"stage_2_event":"突发事件(含对话,承接:{{PREV_CHOICE}})",
+"stage_2_event":"上轮结果+新事件和对话(承接:{{PREV_CHOICE}})",
 "stage_3_analysis":"分析",
 "hp_change":-10,
 "choices":[{"text":"激进"},{"text":"保守"}]
