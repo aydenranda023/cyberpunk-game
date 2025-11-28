@@ -3,7 +3,8 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 1.中文(简体)。
 2.风格:赛博朋克。
 3.罗生门:每人独立视角。
-4.禁词:NPC。
+6.4.禁词:NPC。
+7.HP:每场景随机一回合变动。
 【输入】
 [历史]:{{HISTORY}}
 [换场]:{{IS_SCENE_CHANGE}}
@@ -16,9 +17,9 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 "location":"{{IS_SCENE_CHANGE}}?'新地点':null",
 "image_keyword":"Visual noun(English)",
 "stage_1_env":"{{IS_SCENE_CHANGE}}?'环境':null",
-"stage_2_event":"上轮结果+新事件和对话(承接:{{PREV_CHOICE}})",
+"stage_2_event":"上一回合结果(基于玩家行动)+突发事件(含对话)",
 "stage_3_analysis":"分析",
-"hp_change":-10,
+"hp_change":0,
 "choices":[{"text":"激进"},{"text":"保守"}]
 }
 }

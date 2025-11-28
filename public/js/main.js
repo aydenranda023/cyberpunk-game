@@ -76,8 +76,8 @@ function render(d) {
         i.src = `https://loremflickr.com/640/360/cyberpunk,${d.image_keyword.split(' ')[0].replace(/[^a-zA-Z0-9]/g, "")}?random=${Date.now()}`;
         i.onload = () => { i.style.opacity = 0.8; $('loading-hint').innerText = "LIVE"; };
     }
-    if (d.location) addMsg(`[地点: ${d.location}]`, C);
-    if (d.stage_1_env) { addMsg(d.stage_1_env, C); setTimeout(() => $('next-trigger').style.display = 'block', 1000); }
+    if (d.location && d.location !== "null") addMsg(`[地点: ${d.location}]`, C);
+    if (d.stage_1_env && d.stage_1_env !== "null") { addMsg(d.stage_1_env, C); setTimeout(() => $('next-trigger').style.display = 'block', 1000); }
     else { curStg = 0; window.advanceFragment(); }
     api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid });
 }
