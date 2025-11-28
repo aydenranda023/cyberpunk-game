@@ -78,7 +78,7 @@ function render(d) {
     }
     if (d.location) addMsg(`[地点: ${d.location}]`, C);
     if (d.stage_1_env) { addMsg(d.stage_1_env, C); setTimeout(() => $('next-trigger').style.display = 'block', 1000); }
-    else { curStg = 1; window.advanceFragment(); }
+    else { curStg = 0; window.advanceFragment(); }
     api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid });
 }
 window.advanceFragment = () => {
