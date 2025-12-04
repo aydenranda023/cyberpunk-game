@@ -21,13 +21,18 @@ window.addEventListener('DOMContentLoaded', window.initApp);
 
 function loadChar() { loadUserProfile(getUser().uid).then(v => { if (v?.profile) { myProfile = v.profile; renderLobby(); } else createChar(); }); }
 function createChar() {
-    const roles = [{ id: "Solo", l: "佣兵", h: 120, i: ["步枪"], s: "通缉" }, { id: "Net", l: "黑客", h: 80, i: ["接入仓"], s: "损坏" }, { id: "Doc", l: "医生", h: 90, i: ["急救针"], s: "交易" }];
+    const orgs = ["荒坂", "军用科技", "康陶", "生物技术", "夜氏", "漩涡帮", "虎爪帮", "瓦伦蒂诺"];
+    const names = ["大卫", "露西", "杰克", "V", "强尼", "奥特", "瑞贝卡", "多利欧", "曼恩", "琦薇"];
+    const name = `${orgs[Math.floor(Math.random() * orgs.length)]}·${names[Math.floor(Math.random() * names.length)]}`;
+
+    const roles = [{ id: "Solo", l: "佣兵", h: 120, i: ["动能步枪", "战斗兴奋剂"], s: "通缉" }, { id: "Net", l: "黑客", h: 80, i: ["军用接入仓", "病毒芯片"], s: "损坏" }, { id: "Doc", l: "医生", h: 90, i: ["急救气雾", "手术刀"], s: "交易" }];
     const r = roles[Math.floor(Math.random() * roles.length)];
-    myProfile = { name: `User_${Math.floor(Math.random() * 999)}`, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
+    myProfile = { name: name, role: r.l, public: { hp: r.h, visible_items: r.i }, private: { secret: r.s, hidden_items: [] } };
     saveUserProfile(getUser().uid, myProfile); renderLobby();
 }
 function renderLobby() {
-    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role; $('card-secret').innerText = myProfile.private.secret;
+    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role;
+    $('card-inventory').innerHTML = (myProfile.public.visible_items || []).map(i => `<span style="color:${C};margin-right:5px">[${i}]</span>`).join('');
     hide('step-config'); show('step-lobby');
     listenToRooms(rs => {
         const d = $('room-list-container'); d.innerHTML = "";
