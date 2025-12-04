@@ -210,7 +210,7 @@ async function run(db, rid, uid, sim, isPre, forceIsChg) {
     let ctx = "";
     pIds.forEach(pid => {
         const p = d.players[pid], c = (isPre && pid === uid) ? sim : (p.choice || "进入");
-        ctx += `ID(${pid}):${p.profile?.name}[${p.profile?.role}]\nState:${JSON.stringify(p.profile?.public)}\nSecret:${JSON.stringify(p.profile?.private)}\nAct:${c}\n\n`;
+        ctx += `ID(${pid}):${p.profile?.name}[${p.profile?.role}]\nState:${JSON.stringify(p.profile?.public)}\nAct:${c}\n\n`;
     });
     const pmt = GAME_MASTER_PROMPT.replace('{{HISTORY}}', hist.join("\n")).replace('{{IS_SCENE_CHANGE}}', isChg).replace('{{PLAYER_CONTEXT}}', ctx);
     try {

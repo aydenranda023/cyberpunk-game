@@ -29,11 +29,11 @@ function createChar() {
     const org = orgs[Math.floor(Math.random() * orgs.length)];
     const name = names[Math.floor(Math.random() * names.length)];
 
-    myProfile = { name: `${org}·${name}`, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
+    myProfile = { name: `${org}·${name}`, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { hidden_items: r.i } };
     saveUserProfile(getUser().uid, myProfile); renderLobby();
 }
 function renderLobby() {
-    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role; $('card-secret').innerText = myProfile.private.secret;
+    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role;
     hide('step-config'); show('step-lobby');
     listenToRooms(rs => {
         const d = $('room-list-container'); d.innerHTML = "";
