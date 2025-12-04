@@ -23,7 +23,12 @@ function loadChar() { loadUserProfile(getUser().uid).then(v => { if (v?.profile)
 function createChar() {
     const roles = [{ id: "Solo", l: "佣兵", h: 120, i: ["步枪"], s: "通缉" }, { id: "Net", l: "黑客", h: 80, i: ["接入仓"], s: "损坏" }, { id: "Doc", l: "医生", h: 90, i: ["急救针"], s: "交易" }];
     const r = roles[Math.floor(Math.random() * roles.length)];
-    myProfile = { name: `User_${Math.floor(Math.random() * 999)}`, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
+
+    const orgs = ["荒坂", "军用", "康陶", "夜氏", "漩涡", "虎爪", "六街", "莫克斯", "生物", "网络"];
+    const names = ["零", "暗影", "幽灵", "蝰蛇", "猎鹰", "幻影", "暴徒", "杰克", "强尼", "V", "大卫", "露西", "瑞贝卡", "琦维", "曼恩"];
+    const name = `${orgs[Math.floor(Math.random() * orgs.length)]}·${names[Math.floor(Math.random() * names.length)]}`;
+
+    myProfile = { name: name, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
     saveUserProfile(getUser().uid, myProfile); renderLobby();
 }
 function renderLobby() {
