@@ -23,6 +23,20 @@ export default async function handler(req, res) {
             await db.ref('rooms/' + id).set({ created_at: admin.database.ServerValue.TIMESTAMP, status: 'SOLO', turn: 0, last_scene_change: 0, players: {}, host_info: P || { name: '?', role: '?' } });
             return res.json({ roomId: id });
         }
+        if (A === 'LEAVE_ROOM') {
+            const userRef = db.ref('users/' + U);
+            const rid = (await userRef.child('current_room').once('value')).val();
+            if (rid) {
+                const roomRef = db.ref('rooms/' + rid);
+                await roomRef.child('players/' + U).remove();
+                const pSnap = await roomRef.child('players').once('value');
+                if (!pSnap.exists() || pSnap.numChildren() === 0) {
+                    await roomRef.remove();
+                }
+                await userRef.child('current_room').remove();
+            }
+            return res.json({ success: true });
+        }
         if (A === 'JOIN_ROOM') {
             if (!(await ref.once('value')).exists()) return res.status(404).json({ error: "No Room" });
 

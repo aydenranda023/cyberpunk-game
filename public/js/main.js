@@ -45,7 +45,13 @@ function renderLobby() {
         });
     });
 }
-window.deleteCharacter = () => { if (confirm("Reset?")) removeUserProfile(getUser().uid).then(() => location.reload()); };
+window.deleteCharacter = () => {
+    if (confirm("Reset?")) {
+        api('LEAVE_ROOM', { userId: getUser().uid }).then(() => {
+            removeUserProfile(getUser().uid).then(() => location.reload());
+        });
+    }
+};
 window.toggleInventory = () => {
     const m = $('inventory-modal');
     if (m.classList.contains(H)) {
