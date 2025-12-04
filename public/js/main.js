@@ -34,6 +34,9 @@ function createChar() {
 }
 function renderLobby() {
     $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role;
+    const inv = $('lobby-inventory'); inv.innerHTML = '';
+    if (myProfile.public.weapon) inv.innerHTML += `<span style="color:${C};background:rgba(0,255,255,0.1);padding:2px 6px;border-radius:3px;font-size:0.85rem">🗡️ ${myProfile.public.weapon}</span>`;
+    (myProfile.private.hidden_items || []).forEach(i => inv.innerHTML += `<span style="color:${P};background:rgba(255,0,128,0.1);padding:2px 6px;border-radius:3px;font-size:0.85rem">🔒 ${i}</span>`);
     hide('step-config'); show('step-lobby');
     listenToRooms(rs => {
         const d = $('room-list-container'); d.innerHTML = "";
