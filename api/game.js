@@ -199,6 +199,16 @@ async function run(db, rid, uid, sim, isPre, forceIsChg) {
         ctx += `ID(${pid}):${p.profile?.name}[${p.profile?.role}]\nState:${JSON.stringify(p.profile?.public)}\nSecret:${JSON.stringify(p.profile?.private)}\nAct:${c}\n\n`;
     });
     const pmt = GAME_MASTER_PROMPT.replace('{{HISTORY}}', hist.join("\n")).replace('{{IS_SCENE_CHANGE}}', isChg).replace('{{PLAYER_CONTEXT}}', ctx);
-    try { return JSON.parse((await model.generateContent(pmt)).response.text().match(/\{[\s\S]*\}/)[0]); }
+    try {
+        const raw = JSON.parse((await model.generateContent(pmt)).response.text().match(/\{[\s\S]*\}/)[0]);
+        // Sanitize keys
+        const cleanViews = {};
+        Object.keys(raw.views || {}).forEach(k => {
+            const cleanKey = pIds.find(pid => k.includes(pid)) || k;
+            cleanViews[cleanKey] = raw.views[k];
+        });
+        raw.views = cleanViews;
+        return raw;
+    }
     catch (e) { return { global_summary: "Err", views: { [uid]: { stage_2_event: "Error...", choices: [{ text: "Retry" }, { text: "Wait" }] } } }; }
 }

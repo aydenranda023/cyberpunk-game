@@ -8,6 +8,7 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 6.换场逻辑:
    - 如果[换场]为true: "location"必须是新地点名称, "stage_1_env"必须是环境描写(50字+)。
    - 如果[换场]为false: "location"必须为null, "stage_1_env"必须为null。
+7.Key必须是原始玩家ID(如"uid_123"),不要包含名字或角色。
 【输入】
 [历史]:{{HISTORY}}
 [换场]:{{IS_SCENE_CHANGE}}
@@ -16,7 +17,7 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 {
 "global_summary":"一句话概括(中文)",
 "views":{
-"玩家ID":{
+"原始玩家ID":{
 "location":"地点或null",
 "image_keyword":"Visual noun(English)",
 "stage_1_env":"环境描写或null",
