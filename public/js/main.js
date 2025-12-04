@@ -15,7 +15,20 @@ const api = async (a, b) => {
 window.initApp = () => {
     initFirebase({ apiKey: "AIzaSyAcbkxphcJZlWXq3tJvfbb-xkj_i9LpnsU", authDomain: "cyberpunk-game-0529.firebaseapp.com", databaseURL: "https://cyberpunk-game-0529-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "cyberpunk-game-0529", storageBucket: "cyberpunk-game-0529.firebasestorage.app", messagingSenderId: "619803250426", appId: "1:619803250426:web:495f48f5127a67865f0343", measurementId: "G-DCPC4LKNBL" });
     hide('step-config'); show('loading-overlay');
-    setTimeout(() => signInAnonymously().then(() => { loadChar(); initParticles(); hide('loading-overlay'); }), 1000);
+    setTimeout(() => {
+        signInAnonymously()
+            .then(() => {
+                console.log("Signed in");
+                loadChar();
+                initParticles();
+                hide('loading-overlay');
+            })
+            .catch(e => {
+                console.error("Init failed:", e);
+                alert("Init failed: " + e.message);
+                $('loading-overlay').innerHTML = `<h2 style="color:red">ERROR: ${e.message}</h2>`;
+            });
+    }, 1000);
 };
 window.addEventListener('DOMContentLoaded', window.initApp);
 
