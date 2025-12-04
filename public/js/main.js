@@ -1,7 +1,7 @@
-import { initFirebase, signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, getUser } from './firebase.js';
+import { initFirebase, signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, listenToRoomStatus, getUser } from './firebase.js';
 import { initParticles, playIntroSequence, playDeathSequence } from './visuals.js';
 
-let myProfile, curRid, curData, curStg = 0;
+let myProfile, curRid, curData, curStg = 0, preloadReady = false;
 const $ = i => document.getElementById(i), H = 'hidden', C = 'var(--neon-cyan)', P = 'var(--neon-pink)';
 const show = i => $(i).classList.remove(H), hide = i => $(i).classList.add(H);
 
@@ -91,7 +91,30 @@ window.createSoloGame = async () => {
 };
 window.joinGame = async (id) => {
     const rid = id || $('room-input').value;
-    if ((await api('JOIN_ROOM', { roomId: rid, userId: getUser().uid, userProfile: myProfile })).ok) { curRid = rid; start(); } else alert("Fail");
+    const res = await api('JOIN_ROOM', { roomId: rid, userId: getUser().uid, userProfile: myProfile });
+    if (!res.ok) return alert("Fail");
+    curRid = rid;
+    // Check current room status
+    const status = await res.json().then(d => d.status).catch(() => null);
+    if (status === 'SOLO') {
+        // Host hasn't started yet, show waiting UI
+        hide('step-lobby'); show('step-waiting');
+        $('room-code-disp').innerText = rid;
+        $('player-count').innerHTML = '<span style="animation:pulse 1s infinite">等待玩家进行神经链接...</span>';
+        // Hide start button for non-host
+        document.querySelector('#step-waiting .cyber-btn').style.display = 'none';
+        // Listen for game start
+        listenToRoomStatus(rid, s => {
+            if (s === 'PLAYING') start();
+        });
+        listenToRoomPlayers(rid, c => {
+            const el = $('player-count');
+            if (el.innerText.includes('等待')) el.innerHTML = `<span style="animation:pulse 1s infinite">等待玩家进行神经链接...</span><br><span style="color:var(--cyan)">已连接: ${c}</span>`;
+        });
+    } else {
+        // Game already started, join directly
+        start();
+    }
 };
 window.firstStart = () => { start(); api('START_GAME', { roomId: curRid, userId: getUser().uid }); };
 function start() {
@@ -128,7 +151,8 @@ function render(d) {
         console.log("Skipping Stage 1, advancing...");
         curStg = 0; window.advanceFragment();
     }
-    api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid });
+    preloadReady = false;
+    api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid }).then(() => { preloadReady = true; console.log('Preload ready'); });
 }
 window.advanceFragment = () => {
     console.log("AdvanceFragment called. curStg:", curStg);
@@ -145,7 +169,18 @@ window.advanceFragment = () => {
         addMsg(curData.stage_3_analysis, 'var(--neon-yellow)');
         if (curData.choices?.length >= 2) {
             $('btn-a').innerText = curData.choices[0].text; $('btn-b').innerText = curData.choices[1].text;
-            $('controls').classList.add('active');
+            if (preloadReady) {
+                $('controls').classList.add('active');
+            } else {
+                addMsg('[神经链接中...]', 'var(--neon-yellow)');
+                const checkPreload = setInterval(() => {
+                    if (preloadReady) {
+                        clearInterval(checkPreload);
+                        $('controls').classList.add('active');
+                        addMsg('[链接就绪]', C);
+                    }
+                }, 500);
+            }
         }
         $('content-scroll').scrollTop = $('content-scroll').scrollHeight;
     }

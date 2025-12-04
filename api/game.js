@@ -55,7 +55,8 @@ export default async function handler(req, res) {
 
             await ref.child('players/' + U).update({ joined: true, choice: null, profile: P });
             await userRef.child('current_room').set(R);
-            return res.json({ success: true });
+            const roomStatus = (await ref.child('status').once('value')).val();
+            return res.json({ success: true, status: roomStatus });
         }
         if (A === 'PRELOAD_TURN') {
             const d = (await ref.once('value')).val(), cs = d?.current_scene?.[U]?.choices;

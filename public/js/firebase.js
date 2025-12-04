@@ -10,3 +10,4 @@ export const removeUserProfile = (uid) => db.ref('users/' + uid).remove();
 export const listenToRooms = (cb) => db.ref('rooms').limitToLast(10).on('value', s => cb(s.val()));
 export const listenToRoomPlayers = (rid, cb) => db.ref(`rooms/${rid}/players`).on('value', s => cb(s.numChildren()));
 export const listenToRoomScene = (rid, cb) => db.ref(`rooms/${rid}/current_scene`).on('value', s => cb(s.val()));
+export const listenToRoomStatus = (rid, cb) => db.ref(`rooms/${rid}/status`).on('value', s => cb(s.val()));
