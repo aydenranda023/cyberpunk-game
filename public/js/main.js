@@ -74,6 +74,7 @@ function start() {
     });
 }
 function render(d) {
+    console.log("Render called with:", d);
     hide('wait-overlay'); curData = d; curStg = 0; $('story-box').innerHTML = ""; $('controls').classList.remove('active'); $('next-trigger').style.display = 'none';
     if (d.is_dead) return playDeathSequence().then(() => location.reload());
     if (d.hp_change) {
@@ -89,15 +90,30 @@ function render(d) {
         i.onload = () => { i.style.opacity = 0.8; $('loading-hint').innerText = "LIVE"; };
     }
     if (d.location && d.location !== "null") addMsg(`[地点: ${d.location}]`, C);
-    if (d.stage_1_env && d.stage_1_env !== "null") { addMsg(d.stage_1_env, C); setTimeout(() => $('next-trigger').style.display = 'block', 1000); }
-    else { curStg = 0; window.advanceFragment(); }
+
+    console.log("Stage 1 Env:", d.stage_1_env);
+    if (d.stage_1_env && d.stage_1_env !== "null") {
+        addMsg(d.stage_1_env, C);
+        setTimeout(() => $('next-trigger').style.display = 'block', 1000);
+    } else {
+        console.log("Skipping Stage 1, advancing...");
+        curStg = 0; window.advanceFragment();
+    }
     api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid });
 }
 window.advanceFragment = () => {
+    console.log("AdvanceFragment called. curStg:", curStg);
     $('next-trigger').style.display = 'none';
-    if (curStg === 0) { curStg = 1; addMsg(curData.stage_2_event, P); setTimeout(() => $('next-trigger').style.display = 'block', 1000); }
+    if (curStg === 0) {
+        curStg = 1;
+        console.log("Showing Stage 2 Event:", curData.stage_2_event);
+        addMsg(curData.stage_2_event, P);
+        setTimeout(() => $('next-trigger').style.display = 'block', 1000);
+    }
     else if (curStg === 1) {
-        curStg = 2; addMsg(curData.stage_3_analysis, 'var(--neon-yellow)');
+        curStg = 2;
+        console.log("Showing Stage 3 Analysis:", curData.stage_3_analysis);
+        addMsg(curData.stage_3_analysis, 'var(--neon-yellow)');
         if (curData.choices?.length >= 2) {
             $('btn-a').innerText = `[A] ${curData.choices[0].text}`; $('btn-b').innerText = `[B] ${curData.choices[1].text}`;
             $('controls').classList.add('active');

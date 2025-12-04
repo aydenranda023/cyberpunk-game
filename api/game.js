@@ -54,6 +54,14 @@ export default async function handler(req, res) {
             const isNextChg = (nextTurn >= nextChg);
 
             const [rA, rB] = await Promise.all(cs.map(c => run(db, R, U, c.text, true, isNextChg)));
+
+            // Fix: Strict Sanitization for Preload
+            if (!isNextChg) {
+                [rA, rB].forEach(r => {
+                    Object.values(r.views).forEach(v => { v.stage_1_env = null; v.location = null; });
+                });
+            }
+
             await ref.child(`prebuffer/${U}`).set({ [cs[0].text]: rA, [cs[1].text]: rB });
             return res.json({ status: "PRELOADED" });
         }
