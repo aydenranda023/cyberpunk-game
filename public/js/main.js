@@ -15,20 +15,7 @@ const api = async (a, b) => {
 window.initApp = () => {
     initFirebase({ apiKey: "AIzaSyAcbkxphcJZlWXq3tJvfbb-xkj_i9LpnsU", authDomain: "cyberpunk-game-0529.firebaseapp.com", databaseURL: "https://cyberpunk-game-0529-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "cyberpunk-game-0529", storageBucket: "cyberpunk-game-0529.firebasestorage.app", messagingSenderId: "619803250426", appId: "1:619803250426:web:495f48f5127a67865f0343", measurementId: "G-DCPC4LKNBL" });
     hide('step-config'); show('loading-overlay');
-    setTimeout(() => {
-        signInAnonymously()
-            .then(() => {
-                console.log("Signed in");
-                loadChar();
-                initParticles();
-                hide('loading-overlay');
-            })
-            .catch(e => {
-                console.error("Init failed:", e);
-                alert("Init failed: " + e.message);
-                $('loading-overlay').innerHTML = `<h2 style="color:red">ERROR: ${e.message}</h2>`;
-            });
-    }, 1000);
+    setTimeout(() => signInAnonymously().then(() => { loadChar(); initParticles(); hide('loading-overlay'); }), 1000);
 };
 window.addEventListener('DOMContentLoaded', window.initApp);
 
@@ -36,17 +23,11 @@ function loadChar() { loadUserProfile(getUser().uid).then(v => { if (v?.profile)
 function createChar() {
     const roles = [{ id: "Solo", l: "佣兵", h: 120, i: ["步枪"], s: "通缉" }, { id: "Net", l: "黑客", h: 80, i: ["接入仓"], s: "损坏" }, { id: "Doc", l: "医生", h: 90, i: ["急救针"], s: "交易" }];
     const r = roles[Math.floor(Math.random() * roles.length)];
-
-    const orgs = ["荒坂", "军科", "康陶", "创伤", "夜氏", "漩涡", "虎爪", "六街", "莫克斯", "暗网", "边缘", "赛博", "霓虹", "数据", "虚空"];
-    const names = ["强尼", "杰克", "大卫", "露西", "影", "狼", "鬼", "龙", "零", "壹", "七", "九", "信", "义", "礼", "智", "仁", "勇", "严", "凯", "瑞", "杰"];
-    const name = `${orgs[Math.floor(Math.random() * orgs.length)]}·${names[Math.floor(Math.random() * names.length)]}`;
-
-    myProfile = { name: name, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
+    myProfile = { name: `User_${Math.floor(Math.random() * 999)}`, role: r.l, public: { hp: r.h, weapon: r.i[0] }, private: { secret: r.s, hidden_items: r.i } };
     saveUserProfile(getUser().uid, myProfile); renderLobby();
 }
 function renderLobby() {
-    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role;
-    $('card-items').innerText = (myProfile.private.hidden_items || []).join(', ');
+    $('card-name').innerText = myProfile.name; $('card-role').innerText = myProfile.role; $('card-secret').innerText = myProfile.private.secret;
     hide('step-config'); show('step-lobby');
     listenToRooms(rs => {
         const d = $('room-list-container'); d.innerHTML = "";
