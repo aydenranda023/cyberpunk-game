@@ -4,7 +4,13 @@ import { initParticles, playIntroSequence, playDeathSequence } from './visuals.j
 let myProfile, curRid, curData, curStg = 0;
 const $ = i => document.getElementById(i), H = 'hidden', C = 'var(--neon-cyan)', P = 'var(--neon-pink)';
 const show = i => $(i).classList.remove(H), hide = i => $(i).classList.add(H);
-const api = (a, b) => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: a, ...b }) });
+const api = async (a, b) => {
+    try {
+        const r = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: a, ...b }) });
+        if (!r.ok) throw new Error(`API Error ${r.status}: ${await r.text()}`);
+        return r;
+    } catch (e) { alert(e.message); throw e; }
+};
 
 window.initApp = () => {
     initFirebase({ apiKey: "AIzaSyAcbkxphcJZlWXq3tJvfbb-xkj_i9LpnsU", authDomain: "cyberpunk-game-0529.firebaseapp.com", databaseURL: "https://cyberpunk-game-0529-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "cyberpunk-game-0529", storageBucket: "cyberpunk-game-0529.firebasestorage.app", messagingSenderId: "619803250426", appId: "1:619803250426:web:495f48f5127a67865f0343", measurementId: "G-DCPC4LKNBL" });
@@ -43,10 +49,16 @@ window.toggleInventory = () => {
     } else m.classList.add(H);
 };
 window.createSoloGame = async () => {
-    const d = await (await api('CREATE_ROOM', { userProfile: myProfile })).json(); curRid = d.roomId;
-    await api('JOIN_ROOM', { roomId: curRid, userId: getUser().uid, userProfile: myProfile });
-    hide('step-lobby'); show('step-waiting'); $('room-code-disp').innerText = curRid;
-    listenToRoomPlayers(curRid, c => $('player-count').innerText = `连接数: ${c}`);
+    try {
+        const res = await api('CREATE_ROOM', { userProfile: myProfile });
+        const d = await res.json();
+        if (!d.roomId) throw new Error("No Room ID returned");
+        curRid = d.roomId;
+        console.log("Created Room:", curRid);
+        await api('JOIN_ROOM', { roomId: curRid, userId: getUser().uid, userProfile: myProfile });
+        hide('step-lobby'); show('step-waiting'); $('room-code-disp').innerText = curRid;
+        listenToRoomPlayers(curRid, c => $('player-count').innerText = `连接数: ${c}`);
+    } catch (e) { console.error(e); alert("Create Game Failed: " + e.message); }
 };
 window.joinGame = async (id) => {
     const rid = id || $('room-input').value;
