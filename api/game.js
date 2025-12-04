@@ -25,7 +25,22 @@ export default async function handler(req, res) {
         }
         if (A === 'JOIN_ROOM') {
             if (!(await ref.once('value')).exists()) return res.status(404).json({ error: "No Room" });
+
+            // Cleanup old room
+            const userRef = db.ref('users/' + U);
+            const oldRid = (await userRef.child('current_room').once('value')).val();
+
+            if (oldRid && oldRid !== R) {
+                const oldRoomRef = db.ref('rooms/' + oldRid);
+                await oldRoomRef.child('players/' + U).remove();
+                const pSnap = await oldRoomRef.child('players').once('value');
+                if (!pSnap.exists() || pSnap.numChildren() === 0) {
+                    await oldRoomRef.remove();
+                }
+            }
+
             await ref.child('players/' + U).update({ joined: true, choice: null, profile: P });
+            await userRef.child('current_room').set(R);
             return res.json({ success: true });
         }
         if (A === 'PRELOAD_TURN') {
@@ -39,6 +54,14 @@ export default async function handler(req, res) {
             const isNextChg = (nextTurn >= nextChg);
 
             const [rA, rB] = await Promise.all(cs.map(c => run(db, R, U, c.text, true, isNextChg)));
+
+            // Fix: Strict Sanitization for Preload
+            if (!isNextChg) {
+                [rA, rB].forEach(r => {
+                    Object.values(r.views).forEach(v => { v.stage_1_env = null; v.location = null; });
+                });
+            }
+
             await ref.child(`prebuffer/${U}`).set({ [cs[0].text]: rA, [cs[1].text]: rB });
             return res.json({ status: "PRELOADED" });
         }
@@ -49,7 +72,7 @@ export default async function handler(req, res) {
             // 1. Deterministic Scene Change Logic
             let nextChg = d.next_scene_change;
             if (!nextChg) {
-                nextChg = curTurn + 3 + Math.floor(Math.random() * 4);
+                nextChg = curTurn + 2 + Math.floor(Math.random() * 3);
                 await ref.update({ next_scene_change: nextChg });
             }
             const isChg = (curTurn >= nextChg) || (curTurn === 0);
@@ -99,7 +122,7 @@ export default async function handler(req, res) {
                     const u3 = { turn: curTurn + 1, hp_change_occurred: hpChanged };
                     if (preIsChg) {
                         u3.last_scene_change = curTurn + 1;
-                        u3.next_scene_change = (curTurn + 1) + 3 + Math.floor(Math.random() * 4);
+                        u3.next_scene_change = (curTurn + 1) + 2 + Math.floor(Math.random() * 3);
                     }
                     await ref.update(u3);
                     return res.json({ status: "NEW_TURN" });
@@ -155,7 +178,7 @@ export default async function handler(req, res) {
             const u3 = { turn: curTurn + 1, hp_change_occurred: hpChanged };
             if (isChg) {
                 u3.last_scene_change = curTurn + 1;
-                u3.next_scene_change = (curTurn + 1) + 3 + Math.floor(Math.random() * 4);
+                u3.next_scene_change = (curTurn + 1) + 2 + Math.floor(Math.random() * 3);
             }
             await ref.update(u3);
 
@@ -168,7 +191,7 @@ export default async function handler(req, res) {
 
 async function run(db, rid, uid, sim, isPre, forceIsChg) {
     const d = (await db.ref('rooms/' + rid).once('value')).val(), pIds = Object.keys(d.players || {});
-    const isChg = forceIsChg !== undefined ? forceIsChg : (((d.turn || 0) - (d.last_scene_change || 0) >= (3 + Math.floor(Math.random() * 4))) || (d.turn === 0));
+    const isChg = forceIsChg !== undefined ? forceIsChg : (((d.turn || 0) - (d.last_scene_change || 0) >= (2 + Math.floor(Math.random() * 3))) || (d.turn === 0));
     const hist = Object.values((await db.ref(`rooms/${rid}/history`).once('value')).val() || {}).slice(-3);
     let ctx = "";
     pIds.forEach(pid => {
