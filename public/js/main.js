@@ -4,6 +4,20 @@ import { initParticles, playIntroSequence, playDeathSequence } from './visuals.j
 let myProfile, curRid, curData, curStg = 0;
 const $ = i => document.getElementById(i), H = 'hidden', C = 'var(--neon-cyan)', P = 'var(--neon-pink)';
 const show = i => $(i).classList.remove(H), hide = i => $(i).classList.add(H);
+
+// Rate limiting: max 13 AI requests per minute
+const apiCallTimes = [];
+const RATE_LIMIT = 13, RATE_WINDOW = 60000;
+function checkRateLimit() {
+    const now = Date.now();
+    while (apiCallTimes.length && apiCallTimes[0] < now - RATE_WINDOW) apiCallTimes.shift();
+    if (apiCallTimes.length >= RATE_LIMIT) {
+        const waitMs = apiCallTimes[0] + RATE_WINDOW - now;
+        return { allowed: false, waitMs };
+    }
+    return { allowed: true };
+}
+function recordApiCall() { apiCallTimes.push(Date.now()); }
 const api = async (a, b) => {
     try {
         const r = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: a, ...b }) });
@@ -136,7 +150,24 @@ window.advanceFragment = () => {
         $('content-scroll').scrollTop = $('content-scroll').scrollHeight;
     }
 };
-window.makeChoice = async (t) => { show('wait-overlay'); try { await api('MAKE_MOVE', { roomId: curRid, userId: getUser().uid, choiceText: (t === 'A' ? curData.choices[0].text : curData.choices[1].text) }); } catch (e) { hide('wait-overlay'); } };
+window.makeChoice = async (t) => {
+    const limit = checkRateLimit();
+    if (!limit.allowed) {
+        $('controls').classList.remove('active');
+        const secs = Math.ceil(limit.waitMs / 1000);
+        addMsg(`[系统] AI冷却中... 请等待 ${secs} 秒`, 'var(--neon-yellow)');
+        setTimeout(() => {
+            $('controls').classList.add('active');
+            addMsg(`[系统] AI就绪，可继续选择`, C);
+        }, limit.waitMs);
+        return;
+    }
+    show('wait-overlay');
+    recordApiCall();
+    try {
+        await api('MAKE_MOVE', { roomId: curRid, userId: getUser().uid, choiceText: (t === 'A' ? curData.choices[0].text : curData.choices[1].text) });
+    } catch (e) { hide('wait-overlay'); }
+};
 function addMsg(t, c) {
     if (!t) return; const d = document.createElement('div'); d.className = "msg-block"; d.style.borderLeftColor = c; d.innerText = t;
     $('story-box').appendChild(d); setTimeout(() => d.classList.add('show'), 50); $('content-scroll').scrollTop = $('content-scroll').scrollHeight;
