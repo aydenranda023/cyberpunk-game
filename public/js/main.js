@@ -130,7 +130,7 @@ window.advanceFragment = () => {
         console.log("Showing Stage 3 Analysis:", curData.stage_3_analysis);
         addMsg(curData.stage_3_analysis, 'var(--neon-yellow)');
         if (curData.choices?.length >= 2) {
-            $('btn-a').innerText = `[A] ${curData.choices[0].text}`; $('btn-b').innerText = `[B] ${curData.choices[1].text}`;
+            $('btn-a').innerText = curData.choices[0].text; $('btn-b').innerText = curData.choices[1].text;
             $('controls').classList.add('active');
         }
         $('content-scroll').scrollTop = $('content-scroll').scrollHeight;

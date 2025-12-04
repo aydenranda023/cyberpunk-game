@@ -24,7 +24,7 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 "stage_2_event":"上一回合结果(基于玩家行动)+突发事件(含对话)",
 "stage_3_analysis":"分析",
 "hp_change":0,
-"choices":[{"text":"激进"},{"text":"保守"}]
+"choices":[{"text":"简短行动1(<=10字)"},{"text":"简短行动2(<=10字)"}]
 }
 }
 }`;
