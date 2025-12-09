@@ -1,9 +1,18 @@
 {
-  "name": "cyber-link",
+  "name": "neural-link",
   "version": "1.0.0",
+  "description": "Cyberpunk Text Adventure",
+  "main": "api/game.js",
   "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^11.0.0",
+    "@google/generative-ai": "^0.1.0",
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
