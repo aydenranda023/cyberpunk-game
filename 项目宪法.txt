@@ -329,3 +329,9 @@ AI 返回的 JSON 未来需包含 updates 字段，用于指示后端修改数�
 图片加载：必须有超时处理。超过 3-5 秒未返回 AI 图，立刻切换至备用图库或 Glitch 特效，严禁黑屏。
 
 数据库：后端初始化必须包含防崩溃判定 (!admin.apps.length)。
+
+
+
+supabase url：https://gocnmenhpwqayonaqpum.supabase.co
+ service_role key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvY25tZW5ocHdxYXlvbmFxcHVtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTI4Njk3NSwiZXhwIjoyMDgwODYyOTc1fQ.QbIBNMBCov6Cjo7IePWhe66GPmzkmumpivHqSIA6NuM
+anon Public: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvY25tZW5ocHdxYXlvbmFxcHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NzUsImV4cCI6MjA4MDg2Mjk3NX0.U2PEDY23dhf7Ufuz8Lt9mkI9aJooX_lYnokLYsKs0xs
