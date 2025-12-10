@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.1"
   },
   "engines": {
     "node": "18.x"
