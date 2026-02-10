@@ -27,13 +27,62 @@ const api = async (a, b) => {
 };
 
 window.initApp = async () => {
-    const config = (await import('./config.js')).default;
-    initFirebase({
-        supabaseUrl: config.supabaseUrl,
-        supabaseKey: config.supabaseKey
-    });
-    hide('step-config'); show('loading-overlay');
-    setTimeout(() => signInAnonymously().then(() => { loadChar(); initParticles(); hide('loading-overlay'); }), 1000);
+    try {
+        console.log("InitApp starting...");
+
+        // 1. Load Config
+        console.log("Loading config...");
+        const configModule = await import('./config.js');
+        const config = configModule.default;
+
+        if (!config.supabaseUrl || config.supabaseUrl.includes("YOUR_")) {
+            throw new Error("请在 public/js/config.js 中填写正确的 Supabase 配置");
+        }
+
+        // 2. Check Supabase Lib
+        console.log("Checking Supabase lib...");
+        let attempts = 0;
+        while (!window.supabase && attempts < 20) {
+            await new Promise(r => setTimeout(r, 500));
+            attempts++;
+            console.log("Waiting for Supabase CDN...", attempts);
+        }
+        if (!window.supabase) {
+            throw new Error("无法加载 Supabase 库 (CDN 连接超时)，请检查网络或配置代理");
+        }
+
+        // 3. Init
+        console.log("Initializing Firebase wrapper...");
+        initFirebase({
+            supabaseUrl: config.supabaseUrl,
+            supabaseKey: config.supabaseKey
+        });
+
+        hide('step-config');
+        show('loading-overlay');
+
+        // 4. Login & Start
+        console.log("Signing in...");
+        setTimeout(() => {
+            signInAnonymously()
+                .then(() => {
+                    console.log("Signed in. Loading char...");
+                    loadChar();
+                    initParticles();
+                    hide('loading-overlay');
+                })
+                .catch(e => {
+                    console.error("Login failed:", e);
+                    alert("登录失败: " + e.message);
+                });
+        }, 1000);
+
+    } catch (e) {
+        console.error("Init failed:", e);
+        alert("初始化错误: " + e.message);
+        document.querySelector('#loading-overlay h2').innerText = "ERROR: " + e.message;
+        document.querySelector('#loading-overlay h2').style.color = "red";
+    }
 };
 window.addEventListener('DOMContentLoaded', window.initApp);
 

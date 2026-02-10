@@ -5,6 +5,7 @@
   "main": "api/game.js",
   "type": "module",
   "scripts": {
+    "build": "node scripts/generate-config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -12,6 +13,9 @@
     "@supabase/supabase-js": "^2.39.1"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.x"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.4"
   }
 }
