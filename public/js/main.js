@@ -26,10 +26,11 @@ const api = async (a, b) => {
     } catch (e) { alert(e.message); throw e; }
 };
 
-window.initApp = () => {
+window.initApp = async () => {
+    const config = (await import('./config.js')).default;
     initFirebase({
-        supabaseUrl: "https://gocnmenhpwqayonaqpum.supabase.co",
-        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvY25tZW5ocHdxYXlvbmFxcHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NzUsImV4cCI6MjA4MDg2Mjk3NX0.U2PEDY23dhf7Ufuz8Lt9mkI9aJooX_lYnokLYsKs0xs"
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey
     });
     hide('step-config'); show('loading-overlay');
     setTimeout(() => signInAnonymously().then(() => { loadChar(); initParticles(); hide('loading-overlay'); }), 1000);
