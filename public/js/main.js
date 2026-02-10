@@ -1,4 +1,4 @@
-import { initFirebase, signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, listenToRoomStatus, getUser } from './firebase.js';
+import { initFirebase, signInAnonymously, loadUserProfile, saveUserProfile, removeUserProfile, listenToRooms, listenToRoomPlayers, listenToRoomScene, listenToRoomStatus, getUser } from './supabase-client.js';
 import { initParticles, playIntroSequence, playDeathSequence } from './visuals.js';
 
 let myProfile, curRid, curData, curStg = 0, preloadReady = false;
@@ -68,7 +68,11 @@ window.initApp = async () => {
                 .then(() => {
                     console.log("Signed in. Loading char...");
                     loadChar();
-                    initParticles();
+                    try {
+                        initParticles();
+                    } catch (err) {
+                        console.warn("Visuals init failed (Three.js missing?):", err);
+                    }
                     hide('loading-overlay');
                 })
                 .catch(e => {
