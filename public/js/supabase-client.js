@@ -145,6 +145,23 @@ const subscribeToRoom = (rid, callback) => {
             })
             .subscribe((status) => {
                 console.log(`[Supabase] Channel status: ${status}`);
+                if (status === 'SUBSCRIBED') {
+                    // console.log("[Supabase] Successfully connected to Realtime.");
+                } else if (status === 'CLOSED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                    console.warn(`[Supabase] Channel disconnected (${status}). Attempting to reconnect in 2s...`);
+                    // Clean up current subscription reference so next call creates a new one
+                    if (currentRoomSub === channel) {
+                        currentRoomSub = null;
+                        supabase.removeChannel(channel);
+                    }
+                    // Auto-reconnect after delay
+                    setTimeout(() => {
+                        if (currentRoomId === rid) { // Only reconnect if user hasn't switched rooms
+                            console.log("[Supabase] Reconnecting...");
+                            subscribeToRoom(rid, () => { }); // Callback ignored here as it's already in roomListeners
+                        }
+                    }, 2000);
+                }
             });
 
         currentRoomSub = channel;
