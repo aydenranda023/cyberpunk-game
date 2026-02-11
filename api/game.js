@@ -15,30 +15,44 @@ async function callDeepSeek(prompt) {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) throw new Error("Missing DEEPSEEK_API_KEY");
 
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [
-                { role: "system", content: "You are a creative cyberpunk game master. Output strictly in JSON." },
-                { role: "user", content: prompt }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 1.3
-        })
-    });
+    console.log("[DeepSeek] Sending request...", prompt.substring(0, 50));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`DeepSeek API Error ${response.status}: ${errorText}`);
+    try {
+        const response = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [
+                    { role: "system", content: "You are a creative cyberpunk game master. Output strictly in JSON." },
+                    { role: "user", content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 1.1
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[DeepSeek] API Error ${response.status}: ${errorText}`);
+            throw new Error(`DeepSeek API Error ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log("[DeepSeek] Struct Response:", JSON.stringify(data).substring(0, 100));
+        return data.choices[0].message.content;
+    } catch (error) {
+        clearTimeout(timeout);
+        console.error("[DeepSeek] Fetch Failed:", error);
+        throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
 }
 
 // --- 辅助函数：鲁棒的 JSON 提取器 (Moved to top level) ---
@@ -109,9 +123,9 @@ async function checkAndIncrementQuota() {
         return true; // 数据库挂了暂时放行，或者你可以选择阻断
     }
 
-    console.log(`[Quota] Today's Usage: ${count}/20`);
-    if (count > 20) {
-        throw new Error("QUOTA_EXCEEDED: Daily limit reached (20/20). Please try again tomorrow.");
+    console.log(`[Quota] Today's Usage: ${count}/1000`);
+    if (count > 1000) {
+        throw new Error("QUOTA_EXCEEDED: Daily limit reached (1000/1000). Please try again tomorrow.");
     }
     return count;
 }
