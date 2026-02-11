@@ -20,17 +20,27 @@ export const GAME_MASTER_PROMPT = `你是一个赛博朋克文字游戏GM。
 【输出JSON】
 // 如果是单分支模式 (IS_BATCH=false):
 {
-  "global_summary":"...",
-  "views":{ "原始玩家ID":{ ...同上... } }
+"global_summary":"一句话概括(中文)",
+"views":{
+ "原始玩家ID":{
+ "location":"地点或null (仅在[换场]=true时输出)",
+ "image_keyword":"Visual noun(English)",
+ "stage_1_env":"环境描写或null (仅在[换场]=true时输出)",
+ "stage_2_event":"上一回合结果(基于玩家行动)+突发事件(含对话)",
+ "stage_3_analysis":"局面分析",
+ "hp_change":0,
+ "choices":[{"text":"简短行动1(<=10字)"},{"text":"简短行动2(<=10字)"}]
+ }
+}
 }
 // 如果是双分支模式 (IS_BATCH=true):
 {
   "branch_A": {
     "global_summary":"...",
-    "views":{ "原始玩家ID":{ ...基于选项A的后果... } }
+    "views":{ "原始玩家ID":{ ...同上... } }
   },
   "branch_B": {
     "global_summary":"...",
-    "views":{ "原始玩家ID":{ ...基于选项B的后果... } }
+    "views":{ "原始玩家ID":{ ...同上... } }
   }
 }`;

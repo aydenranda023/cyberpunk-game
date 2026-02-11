@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// import { GoogleGenerativeAI } from "@google/generative-ai"; // Removed
 // 注意：我们需要稍后更新 prompt_bank.js 以匹配新的通用引擎，
 // 但为了兼容性，这里暂时保留引用，代码逻辑里会做动态替换。
 import { GAME_MASTER_PROMPT } from './lib/prompt_bank.js';
@@ -10,7 +10,51 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY).getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+// DeepSeek API Helper
+async function callDeepSeek(prompt) {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) throw new Error("Missing DEEPSEEK_API_KEY");
+
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+                { role: "system", content: "You are a creative cyberpunk game master. Output strictly in JSON." },
+                { role: "user", content: prompt }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 1.3
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`DeepSeek API Error ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+// --- 辅助函数：鲁棒的 JSON 提取器 (Moved to top level) ---
+function extractJSON(text) {
+    text = text.replace(/```json/g, '').replace(/```/g, '');
+    const start = text.indexOf('{');
+    if (start === -1) return null;
+    let balance = 0;
+    let end = -1;
+    for (let i = start; i < text.length; i++) {
+        if (text[i] === '{') balance++;
+        else if (text[i] === '}') balance--;
+        if (balance === 0) { end = i + 1; break; }
+    }
+    return end !== -1 ? text.substring(start, end) : text.substring(start);
+}
 
 // 辅助函数：读取房间 JSON
 async function getRoom(rid) {
@@ -94,14 +138,36 @@ export default async function handler(req, res) {
                 vocab: { hp: "HP", inv: "Inventory" }
             };
 
+            // 立即生成序章 (Chapter 0)
+            let initialAI;
+            try {
+                initialAI = await runSingle(
+                    { created_at: Date.now(), turn: 0, last_scene_change: 0, history: [], players: {}, world_setting: W || defaultWorld },
+                    id,
+                    'system',
+                    '进入世界',
+                    false,
+                    true
+                );
+            } catch (err) {
+                console.error("Initial AI Gen Failed:", err);
+                initialAI = {
+                    global_summary: "系统错误: 初始化数据流中断",
+                    views: { 'system': { stage_1_env: `神经连接不稳定: ${err.message}`, location: "未知区域", choices: [] } }
+                };
+            }
+
             const newRoomData = {
                 created_at: Date.now(),
                 status: 'SOLO',
                 turn: 0,
                 last_scene_change: 0,
+                next_scene_change: 2 + Math.floor(Math.random() * 3),
                 players: {},
                 host_info: P || { name: '?', role: '?' },
-                world_setting: W || defaultWorld // 注入世界观
+                world_setting: W || defaultWorld,
+                current_scene: initialAI.views,
+                history: [`[序章] ${initialAI.global_summary}`]
             };
 
             await saveRoom(id, newRoomData);
@@ -386,13 +452,13 @@ async function runBatch(roomData, rid, uid, cA, cB, forceIsChg) {
     pmt = pmt.replace('{{GENRE}}', w.genre).replace('{{TONE}}', w.tone || "").replace('{{VOCAB_HP}}', w.vocab?.hp || "HP");
 
     try {
-        console.log(`[Gemini] Generating batch with model: gemini-2.5-flash-lite`);
-        const result = await model.generateContent(pmt);
-        const text = result.response.text();
-        console.log(`[Gemini] Raw batch response length: ${text.length}`);
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No JSON found in AI batch response");
-        const raw = JSON.parse(jsonMatch[0]);
+        console.log(`[DeepSeek] Generating batch...`);
+        const text = await callDeepSeek(pmt);
+        console.log(`[DeepSeek] Raw batch response length: ${text.length}`);
+
+        const jsonStr = extractJSON(text);
+        if (!jsonStr) throw new Error("No JSON found in AI batch response");
+        const raw = JSON.parse(jsonStr);
 
         // 简单校验
         if (!raw.branch_A || !raw.branch_B) throw new Error("AI failed to generate branches");
@@ -435,7 +501,16 @@ async function runSingle(roomData, rid, uid, simChoice, isPre, forceIsChg) {
         ctx += `ID(${pid}):${p.profile?.name}[${p.profile?.role}]\nState:${JSON.stringify(p.profile?.public)}\nAct:${c}\n\n`;
     });
 
-    let pmt = GAME_MASTER_PROMPT
+    // 动态裁剪 Prompt：如果是单模式，把 Batch 相关说明去掉，防止 AI 犯蠢输出双分支
+    let basePrompt = GAME_MASTER_PROMPT;
+    if (!isPre) {
+        // 移除关于 [预加载模式] 的说明 (Line 8-14 in prompt_bank.js)
+        basePrompt = basePrompt.replace(/8\. \[预加载模式\]:[\s\S]*?互不干扰\。/, "");
+        // 移除关于 JSON 双分支的示例
+        basePrompt = basePrompt.replace(/\/\/ 如果是双分支模式 \(IS_BATCH=true\):[\s\S]*?\}/, "");
+    }
+
+    let pmt = basePrompt
         .replace('{{HISTORY}}', hist.join("\n"))
         .replace('{{IS_SCENE_CHANGE}}', isChg)
         .replace('{{PLAYER_CONTEXT}}', ctx)
@@ -449,14 +524,24 @@ async function runSingle(roomData, rid, uid, simChoice, isPre, forceIsChg) {
     };
     pmt = pmt.replace('{{GENRE}}', w.genre).replace('{{TONE}}', w.tone || "").replace('{{VOCAB_HP}}', w.vocab?.hp || "HP");
 
+
+
+    // ... Inside runSingle ...
     try {
-        console.log(`[Gemini] Generating single with model: gemini-2.5-flash-lite`);
-        const result = await model.generateContent(pmt);
-        const text = result.response.text();
-        console.log(`[Gemini] Raw single response length: ${text.length}`);
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No JSON found in AI single response");
-        const raw = JSON.parse(jsonMatch[0]);
+        console.log(`[DeepSeek] Generating single...`);
+        const text = await callDeepSeek(pmt);
+        console.log(`[DeepSeek] Raw single response length: ${text.length}`);
+        console.log(`[DeepSeek] Raw response:`, text);
+
+        const jsonStr = extractJSON(text);
+        if (!jsonStr) {
+            console.error("[DeepSeek] Invalid Response Preview:", text.substring(0, 500));
+            throw new Error("No JSON found in AI single response");
+        }
+
+        // 尝试解析
+        const raw = JSON.parse(jsonStr);
+
 
         // 清洗 Key (防止 AI 幻觉生成错误的 UID Key)
         const cleanViews = {};

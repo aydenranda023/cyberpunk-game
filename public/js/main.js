@@ -138,6 +138,11 @@ window.createSoloGame = async () => {
     try {
         const res = await api('CREATE_ROOM', { userProfile: myProfile });
         const d = await res.json();
+        if (d._debug_raw) {
+            console.groupCollapsed("[AI Raw Debug]");
+            console.log(d._debug_raw);
+            console.groupEnd();
+        }
         if (!d.roomId) throw new Error("No Room ID returned");
         curRid = d.roomId;
         console.log("Created Room:", curRid);
@@ -184,9 +189,12 @@ function start() {
     console.log("Listening to room scene:", curRid);
     listenToRoomScene(curRid, d => {
         console.log("Room scene update:", d);
-        if (d) render(d[getUser().uid] || d);
+        // Chapter 0 uses 'system' key, subsequent chapters use getUser().uid
+        const myData = d[getUser().uid] || d['system'] || d;
+        if (myData) render(myData);
     });
-}
+} // Close start function
+
 let lastRenderedData = null;
 function render(d) {
     if (!d) return;
@@ -225,7 +233,23 @@ function render(d) {
         curStg = 0; window.advanceFragment();
     }
     preloadReady = false;
-    api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid }).then(() => { preloadReady = true; console.log('Preload ready'); });
+    // 延迟 1秒 再发起预加载，避开 Gemini 40s/60rpm 的速率限制
+    // 同时给用户一点阅读时间
+    setTimeout(() => {
+        console.log("Initiating preload...");
+        api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid })
+            .then(res => res.json())
+            .then(d => {
+                if (d.status === 'PRELOADED') {
+                    preloadReady = true;
+                    console.log('Preload ready');
+                    addMsg('[神经预测完成]', 'var(--neon-green)');
+                } else if (d.error || d.msg) {
+                    console.warn('Preload skipped/failed:', d);
+                }
+            })
+            .catch(e => console.warn("Preload error (ignored):", e));
+    }, 1000);
 }
 window.advanceFragment = () => {
     if (!curData) return; // Prevent crash if clicked too early
