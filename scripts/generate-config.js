@@ -19,10 +19,17 @@ export default config;
 
 const targetPath = path.join(process.cwd(), 'public', 'js', 'config.js');
 
-// Only overwrite if env vars exist (to avoid breaking local dev if env is missing)
-if (process.env.SUPABASE_URL) {
+// Check for Vercel environment
+const isVercel = process.env.VERCEL === '1';
+
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
     fs.writeFileSync(targetPath, configContent);
     console.log('✅ Generated public/js/config.js from environment variables.');
 } else {
-    console.log('⚠️  SUPABASE_URL not found in environment. Skipping config generation.');
+    if (isVercel) {
+        console.error('❌ Error: SUPABASE_URL and SUPABASE_ANON_KEY are required in Vercel Environment Variables.');
+        process.exit(1); // Fail the build
+    } else {
+        console.log('⚠️  Local dev: SUPABASE_URL not found. Skipping config generation (assuming config.js exists or will be manual).');
+    }
 }

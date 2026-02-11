@@ -103,30 +103,50 @@ export const listenToRoomStatus = (rid, cb) => {
     });
 };
 
-// 辅助：单例订阅模式，避免同一个房间建立多个连接
+// 辅助：单例订阅模式 (支持多个监听者)
 let currentRoomSub = null;
+let currentRoomId = null;
+let roomListeners = [];
+
 const subscribeToRoom = (rid, callback) => {
-    if (currentRoomSub) supabase.removeChannel(currentRoomSub);
+    // 1. 如果ID变了，清理旧的
+    if (currentRoomId && currentRoomId !== rid) {
+        console.log(`[Supabase] Switching room from ${currentRoomId} to ${rid}`);
+        if (currentRoomSub) supabase.removeChannel(currentRoomSub);
+        currentRoomSub = null;
+        roomListeners = [];
+    }
 
-    // 1. 初始读取
-    supabase.from('rooms').select('data').eq('id', rid).single()
-        .then(({ data }) => {
-            if (data) callback(data.data);
-        });
+    currentRoomId = rid;
+    roomListeners.push(callback);
 
-    // 2. Realtime subscribe
-    console.log(`[Supabase] Subscribing to room:${rid}...`);
-    const channel = supabase.channel(`room:${rid}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${rid}` }, (payload) => {
-            console.log("[Supabase] Realtime update received:", payload);
-            callback(payload.new.data);
-        })
-        .subscribe((status) => {
-            console.log(`[Supabase] Channel status: ${status}`);
-            if (status === 'SUBSCRIBED') {
-                console.log("[Supabase] Successfully connected to Realtime.");
-            }
-        });
+    // 2. 如果已经订阅，直接触发一次当前缓存数据 (如果有)
+    // (这里简化处理，依赖 Realtime 推送，或者可以在这里加个 cache)
 
-    currentRoomSub = channel;
+    // 3. 如果没订阅，发起订阅
+    if (!currentRoomSub) {
+        console.log(`[Supabase] Subscribing to room:${rid}...`);
+
+        // 3.1 Initial Fetch
+        supabase.from('rooms').select('data').eq('id', rid).maybeSingle()
+            .then(({ data }) => {
+                if (data) {
+                    // Notify all listeners
+                    roomListeners.forEach(cb => cb(data.data));
+                }
+            });
+
+        // 3.2 Realtime Subscription
+        const channel = supabase.channel(`room:${rid}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${rid}` }, (payload) => {
+                console.log("[Supabase] Realtime update received");
+                // Notify all listeners
+                roomListeners.forEach(cb => cb(payload.new.data));
+            })
+            .subscribe((status) => {
+                console.log(`[Supabase] Channel status: ${status}`);
+            });
+
+        currentRoomSub = channel;
+    }
 };
