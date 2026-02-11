@@ -394,7 +394,7 @@ async function run(roomData, rid, uid, simChoice, isPre, forceIsChg) {
         // 降级处理
         return {
             global_summary: "系统错误: 数据流中断",
-            views: { [uid]: { stage_2_event: "神经连接不稳定...", choices: [{ text: "重试" }, { text: "等待" }] } }
+            views: { [uid]: { stage_2_event: `神经连接不稳定: ${e.message}`, choices: [{ text: "重试" }, { text: "等待" }] } }
         };
     }
 }

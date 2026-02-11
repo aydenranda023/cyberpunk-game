@@ -114,12 +114,19 @@ const subscribeToRoom = (rid, callback) => {
             if (data) callback(data.data);
         });
 
-    // 2. 实时订阅
+    // 2. Realtime subscribe
+    console.log(`[Supabase] Subscribing to room:${rid}...`);
     const channel = supabase.channel(`room:${rid}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${rid}` }, (payload) => {
+            console.log("[Supabase] Realtime update received:", payload);
             callback(payload.new.data);
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log(`[Supabase] Channel status: ${status}`);
+            if (status === 'SUBSCRIBED') {
+                console.log("[Supabase] Successfully connected to Realtime.");
+            }
+        });
 
     currentRoomSub = channel;
 };

@@ -176,13 +176,29 @@ window.joinGame = async (id) => {
 window.firstStart = () => { start(); api('START_GAME', { roomId: curRid, userId: getUser().uid }); };
 function start() {
     $('modal').style.display = 'none';
-    playIntroSequence().then(() => {
-        $('terminal').style.visibility = 'visible'; $('terminal').style.opacity = 1;
-        $('hud-name').innerText = myProfile.name; $('hud-hp').innerText = myProfile.public.hp;
-        listenToRoomScene(curRid, d => { if (d) render(d[getUser().uid] || d); });
+    // Don't wait for intro, just play it and show terminal immediately
+    playIntroSequence().catch(e => console.error(e));
+
+    $('terminal').style.visibility = 'visible'; $('terminal').style.opacity = 1;
+    $('hud-name').innerText = myProfile.name; $('hud-hp').innerText = myProfile.public.hp;
+    console.log("Listening to room scene:", curRid);
+    listenToRoomScene(curRid, d => {
+        console.log("Room scene update:", d);
+        if (d) render(d[getUser().uid] || d);
     });
 }
+let lastRenderedData = null;
 function render(d) {
+    if (!d) return;
+
+    // Convert to JSON for comparison (ignore function properties if any)
+    const jsonStr = JSON.stringify(d);
+    if (lastRenderedData === jsonStr) {
+        console.log("Skipping redundant render (data identical)");
+        return;
+    }
+    lastRenderedData = jsonStr;
+
     console.log("Render called with:", d);
     hide('wait-overlay'); curData = d; curStg = 0; $('story-box').innerHTML = ""; $('controls').classList.remove('active'); $('next-trigger').style.display = 'none';
     if (d.is_dead) return playDeathSequence().then(() => location.reload());
@@ -212,6 +228,7 @@ function render(d) {
     api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid }).then(() => { preloadReady = true; console.log('Preload ready'); });
 }
 window.advanceFragment = () => {
+    if (!curData) return; // Prevent crash if clicked too early
     console.log("AdvanceFragment called. curStg:", curStg);
     $('next-trigger').style.display = 'none';
     if (curStg === 0) {
@@ -257,8 +274,18 @@ window.makeChoice = async (t) => {
     show('wait-overlay');
     recordApiCall();
     try {
-        await api('MAKE_MOVE', { roomId: curRid, userId: getUser().uid, choiceText: (t === 'A' ? curData.choices[0].text : curData.choices[1].text) });
-    } catch (e) { hide('wait-overlay'); }
+        console.log("Sending MAKE_MOVE...");
+        const res = await api('MAKE_MOVE', { roomId: curRid, userId: getUser().uid, choiceText: (t === 'A' ? curData.choices[0].text : curData.choices[1].text) });
+        const json = await res.json();
+        console.log("MAKE_MOVE Result:", json);
+        if (json.status === 'WAITING') {
+            addMsg('[系统] 等待其他玩家...', 'var(--neon-yellow)');
+        }
+    } catch (e) {
+        console.error("MAKE_MOVE Error:", e);
+        hide('wait-overlay');
+        alert("通讯失败: " + e.message);
+    }
 };
 function addMsg(t, c) {
     if (!t) return; const d = document.createElement('div'); d.className = "msg-block"; d.style.borderLeftColor = c; d.innerText = t;
