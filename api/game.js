@@ -372,8 +372,13 @@ async function run(roomData, rid, uid, simChoice, isPre, forceIsChg) {
         .replace('{{VOCAB_HP}}', w.vocab?.hp || "HP");
 
     try {
+        console.log(`[Gemini] Generating with model: gemini-2.5-flash-lite`);
+        console.log(`[Gemini] Key loaded: ${process.env.GEMINI_API_KEY ? 'Yes (Starts with ' + process.env.GEMINI_API_KEY.substring(0, 4) + ')' : 'NO'}`);
+
         const result = await model.generateContent(pmt);
         const text = result.response.text();
+        console.log(`[Gemini] Raw response length: ${text.length}`);
+        // console.log(`[Gemini] Raw response:`, text); // Uncomment if needed
         // 提取 JSON
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("No JSON found in AI response");
