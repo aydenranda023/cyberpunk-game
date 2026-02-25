@@ -233,23 +233,19 @@ function render(d) {
         curStg = 0; window.advanceFragment();
     }
     preloadReady = false;
-    // 延迟 1秒 再发起预加载，避开 Gemini 40s/60rpm 的速率限制
-    // 同时给用户一点阅读时间
-    setTimeout(() => {
-        console.log("Initiating preload...");
-        api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid })
-            .then(res => res.json())
-            .then(d => {
-                if (d.status === 'PRELOADED') {
-                    preloadReady = true;
-                    console.log('Preload ready');
-                    addMsg('[神经预测完成]', 'var(--neon-green)');
-                } else if (d.error || d.msg) {
-                    console.warn('Preload skipped/failed:', d);
-                }
-            })
-            .catch(e => console.warn("Preload error (ignored):", e));
-    }, 1000);
+    // 立即发起预加载，加快后续响应速度，不再提示
+    console.log("Initiating preload...");
+    api('PRELOAD_TURN', { roomId: curRid, userId: getUser().uid })
+        .then(res => res.json())
+        .then(d => {
+            if (d.status === 'PRELOADED') {
+                preloadReady = true;
+                console.log('Preload ready');
+            } else if (d.error || d.msg) {
+                console.warn('Preload skipped/failed:', d);
+            }
+        })
+        .catch(e => console.warn("Preload error (ignored):", e));
 }
 window.advanceFragment = () => {
     if (!curData) return; // Prevent crash if clicked too early
@@ -270,12 +266,10 @@ window.advanceFragment = () => {
             if (preloadReady) {
                 $('controls').classList.add('active');
             } else {
-                addMsg('[神经链接中...]', 'var(--neon-yellow)');
                 const checkPreload = setInterval(() => {
                     if (preloadReady) {
                         clearInterval(checkPreload);
                         $('controls').classList.add('active');
-                        addMsg('[链接就绪]', C);
                     }
                 }, 500);
             }
