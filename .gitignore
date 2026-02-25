@@ -25,3 +25,4 @@ yarn-error.log*
 *.sw?
 .vercel
 .env*.local
+项目宪法.txt

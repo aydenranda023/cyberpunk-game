@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NEURAL LINK // UNIVERSE</title>
+    <link rel="stylesheet" href="css/universe.css">
+    <!-- 引入 Three.js 和 GSAP 用于动画 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body>
+
+    <!-- 底层：WebGL 渲染画布 -->
+    <canvas id="universe-canvas"></canvas>
+
+    <!-- 交互层：UI HUD -->
+    <div id="ui-layer">
+
+        <!-- 左上角：状态监控仪 -->
+        <div id="status-hud" class="glass-panel">
+            <div class="hud-item current-universe">UNIVERSE: <span id="hud-universe">Cyberpunk</span></div>
+            <div class="hud-item">HP: <span id="hud-hp" class="text-glow">100</span></div>
+            <div class="hud-item tension-bar-container">
+                TENSION: <span id="hud-tension">10</span>%
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="tension-fill"></div>
+                </div>
+            </div>
+            <div class="hud-item objective">OBJECTIVE: <br><span id="hud-objective"
+                    style="color:var(--text-color); font-size:0.8rem">生存下去</span></div>
+        </div>
+
+        <!-- 顶部控制：重置与跳跃测试 -->
+        <div id="top-controls">
+            <button class="cyber-btn sm" id="btn-jump" onclick="testJump()">[+] 强制跃迁</button>
+            <button class="cyber-btn sm" id="btn-reset" onclick="resetUniverse()">[R] 重启终端</button>
+        </div>
+
+        <!-- 居中剧情面板 -->
+        <div id="narrative-panel" class="glass-panel">
+            <div id="story-content">
+                初始化神经链接中，正在同步宇宙节点数据...
+            </div>
+        </div>
+
+        <!-- 底部战术指令台 -->
+        <div id="action-deck">
+            <div id="loading-indicator" class="hidden">
+                <span class="pulse-text">SYSTEM CALCULATING...</span>
+            </div>
+            <div id="choices-container">
+                <!-- 动态生成的选项按钮会注入在这里 -->
+            </div>
+            <!-- 原型测试用的降级文本输入框（隐藏在内联样式，需要时可解开）-->
+            <div style="display: flex; gap:10px; margin-top: 10px; display: none;" id="fallback-input-area">
+                <input type="text" id="action-input" placeholder="输入自定义指令...">
+                <button class="cyber-btn" onclick="submitCustomAction()">执行</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 引入主逻辑脚本 -->
+    <!-- 改写为 Module -->
+    <script type="module" src="js/universe.js"></script>
+</body>
+
+</html>

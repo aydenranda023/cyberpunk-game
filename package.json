@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.0",
-    "@supabase/supabase-js": "^2.39.1"
+    "@supabase/supabase-js": "^2.39.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
   },
   "engines": {
-    "node": "22.x"
+    "node": ">=22"
   },
   "devDependencies": {
-    "dotenv": "^17.2.4"
+    "dotenv": "^17.3.1"
   }
 }
