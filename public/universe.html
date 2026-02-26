@@ -6,32 +6,32 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NEURAL LINK // THE SYNTHESIZER V4</title>
+    <!-- Modular Styles -->
     <link rel="stylesheet" href="css/universe.css">
+    <link rel="stylesheet" href="css/chronicle.css">
+    <link rel="stylesheet" href="css/event_lines.css">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 
 <body>
-    <!-- Main layout container: Split-screen 60/40 Inverted -->
     <div id="app-container">
-
         <!-- Upper (60%): 3D Multiverse & Chronicle Panel -->
         <div id="upper-view">
-            <!-- 3D WebGL Container -->
             <div id="canvas-container">
                 <canvas id="universe-canvas"></canvas>
             </div>
 
-            <!-- Left/Top Floating Chronicle Panel for Story Narration -->
+            <!-- Story Chronicle Panel (Log) -->
             <div id="chronicle-panel">
                 <div class="panel-header">CHRONICLE // 命运日志</div>
                 <div id="chronicle-content">
-                    <!-- Text blocks will be appended here dynamically -->
                     <div class="log-entry system-msg">等待神经链路接入...</div>
                 </div>
             </div>
 
-            <!-- Top Right HUD -->
+            <!-- HUD Controls -->
             <div id="status-hud">
                 <div class="hud-item">
                     <span class="hud-label">TENSION: </span>
@@ -42,47 +42,41 @@
                 </div>
                 <!-- Controls -->
                 <div class="control-panel">
-                    <button class="minimal-btn" onclick="testJump()">[+] 维度跃迁</button>
+                    <button class="minimal-btn disabled" disabled title="即将上线">[M] 多人模式</button>
+                    <!-- <button class="minimal-btn" onclick="testJump()">[+] 维度跃迁</button> -->
                     <button class="minimal-btn danger" onclick="resetUniverse()">[R] 重启终端</button>
                 </div>
             </div>
 
-            <!-- Bottom Floating Synthesis Dock -->
+            <!-- Synthesis Dock -->
             <div id="synthesis-dock-container">
                 <div class="dock-header">SYNTHESIS DOCK</div>
                 <div id="dock-dropzone">
                     <span class="placeholder-text">DRAG CARDS HERE<br><small>将下方胶囊拖入此槽位</small></span>
-                    <!-- Drop items (Microcards) go here -->
                 </div>
                 <button id="btn-synthesize" class="action-btn" disabled>SYNTHESIZE / 合成推演</button>
             </div>
 
-            <!-- Floating Node Info Card (Usually hidden, appears when clicking a 3D Node) -->
-            <div id="node-info-card" class="hidden" draggable="false">
+            <!-- Node Info Card -->
+            <div id="node-info-card" class="hidden">
                 <div class="card-header">
                     NODE <span id="card-node-id" class="mono-text">N/A</span>
                     <button id="btn-close-card" class="close-btn">&times;</button>
                 </div>
-                <div id="card-narrative-summary" class="card-body">
-                    <!-- Snapshot text here -->
-                </div>
+                <div id="card-narrative-summary" class="card-body"></div>
             </div>
         </div>
 
-        <!-- Divider -->
         <div class="divider"></div>
 
-        <!-- Lower (40%): 2D Event Lines Subway Map -->
+        <!-- Lower (40%): 2D Event Lines -->
         <div id="lower-view">
             <div class="panel-header">EVENT INTERSECTION // 平行事件轨</div>
-            <div id="event-lines-container">
-                <!-- Tracks will be generated via JS -->
-            </div>
+            <div id="event-lines-container"></div>
         </div>
-
     </div>
 
-    <!-- Scripts -->
+    <!-- Main Entry Module -->
     <script type="module" src="js/universe.js"></script>
 </body>
 

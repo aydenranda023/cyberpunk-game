@@ -25,16 +25,19 @@ const hitMaterial = new THREE.MeshBasicMaterial({
 // 使用基础的高分段球体作为地铁站/音符锚点
 const nodeGeometry = new THREE.SphereGeometry(0.3, 32, 32);
 
-// 创造一个圆形的粒子透明贴图
+// 创造一个柔和的发光粒子贴图
 const canvas2d = document.createElement('canvas');
-canvas2d.width = 64;
-canvas2d.height = 64;
+canvas2d.width = 128;
+canvas2d.height = 128;
 const ctx = canvas2d.getContext('2d');
-ctx.beginPath();
-ctx.arc(32, 32, 30, 0, Math.PI * 2);
-ctx.fillStyle = 'white';
-ctx.fill();
-const circleTexture = new THREE.CanvasTexture(canvas2d);
+const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
+gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, 128, 128);
+const glowTexture = new THREE.CanvasTexture(canvas2d);
 
 function getBranchMaterial(colorHex) {
     // 平滑的实体连线材质
@@ -49,17 +52,15 @@ function getBranchMaterial(colorHex) {
 }
 
 function getNodeMaterial(colorHex) {
-    // 干净的发光小球材质，增加基础颜色以防太淡
-    return new THREE.MeshPhysicalMaterial({
-        color: colorHex, // 将颜色填入实体
-        emissive: colorHex,
-        emissiveIntensity: 0.3,
-        roughness: 0.1,
-        metalness: 0.1,
+    // 改用 PointsMaterial 配合发光贴图，让节点看起来像能量脉冲
+    return new THREE.PointsMaterial({
+        color: colorHex,
+        size: 0.8,
+        map: glowTexture,
         transparent: true,
-        opacity: 1.0,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true
     });
 }
 
@@ -234,9 +235,7 @@ function setupControls(canvas, onClick, onVoidClick) {
 // ==========================================
 
 function createBranchLine(p1, p2, colorHex) {
-    // 使用贝塞尔曲线使平行轨道在切变时显得平滑
-    const points = [];
-    // 平滑弯曲的轨迹：起点 -> 起点加X位移 -> 终点减X位移 -> 终点
+    // 使用贝塞尔曲线
     const midX = (p1.x + p2.x) / 2;
     const curve = new THREE.CubicBezierCurve3(
         p1,
@@ -245,17 +244,26 @@ function createBranchLine(p1, p2, colorHex) {
         p2
     );
 
-    // 生成带厚度的管线而不是单像素的 Line
-    const tubeGeom = new THREE.TubeGeometry(curve, 20, 0.08, 8, false); // 稍微加粗从 0.05 变 0.08
+    // 有机感：改用更细的线，增加多重笔触效果
+    const points = curve.getPoints(50);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
-    // 材质
-    const mat = getBranchMaterial(colorHex);
+    // 主连线
+    const mat = new THREE.LineBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending
+    });
 
-    return new THREE.Mesh(tubeGeom, mat);
+    return new THREE.Line(geometry, mat);
 }
 
-function createNodeMesh(colorHex) {
-    return new THREE.Mesh(nodeGeometry, getNodeMaterial(colorHex));
+function createNodeMesh(colorHex, pos) {
+    // 使用 Points 替代 Mesh(Sphere)
+    const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0)]);
+    const points = new THREE.Points(geometry, getNodeMaterial(colorHex));
+    return points;
 }
 
 // 批量构建初次加载或者跳跃产生的新起点树
@@ -275,16 +283,10 @@ export function buildUniverseGraph(nodesData) {
             const isJumpNode = node.action_type === 'jump' ||
                 (nodesData.find(n => n.node_id === node.parent_id)?.universe_tag !== node.universe_tag);
 
-            if (isJumpNode) {
-                // 维度跳跃大分支
-                pos.set(parentPos.x + 10.0, parentPos.y + (Math.random() - 0.5) * 10, parentPos.z + spacingZ - 5);
-                branchIsJump = true;
-            } else {
-                // 神经网络分支：向前上方/下方/侧面微弱分叉
-                const offsetY = (Math.random() - 0.5) * 4.0;
-                const offsetZ = (Math.random() - 0.5) * 4.0;
-                pos.set(parentPos.x + 5.0, parentPos.y + offsetY, parentPos.z + offsetZ);
-            }
+            // 统一神经网络分支逻辑：移除 Z 轴跃迁
+            const offsetY = (Math.random() - 0.5) * 4.0;
+            const offsetZ = (Math.random() - 0.5) * 4.0;
+            pos.set(parentPos.x + 5.0, parentPos.y + offsetY, parentPos.z + offsetZ);
         }
 
         nodePositions[node.node_id] = pos;
@@ -322,21 +324,15 @@ export function appendNewNode(newNode, oldNodeObj) {
     let pos = new THREE.Vector3();
     let branchIsJump = false;
 
-    if (newNode.action_type === 'jump' || (oldNodeObj && oldNodeObj.universe_tag !== newNode.universe_tag)) {
-        pos.set(
-            parentPos.x + 10.0,
-            parentPos.y + (Math.random() - 0.5) * 10,
-            parentPos.z - 10.0
-        );
-        branchIsJump = true;
-    } else {
-        // 神经网络分支
-        pos.set(
-            parentPos.x + 5.0,
-            parentPos.y + (Math.random() - 0.5) * 4.0,
-            parentPos.z + (Math.random() - 0.5) * 4.0
-        );
-    }
+    // 神经网络分支：向前上方/下方/侧面微弱分叉
+    pos.set(
+        parentPos.x + 5.0,
+        parentPos.y + (Math.random() - 0.5) * 4.0,
+        parentPos.z + (Math.random() - 0.5) * 4.0
+    );
+
+    // 强制不显示维度跳跃效果
+    branchIsJump = false;
 
     nodePositions[newNode.node_id] = pos;
     const color = getColorForUniverse(newNode.universe_tag);
@@ -397,11 +393,15 @@ const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
-    // const time = clock.getElapsedTime(); // 移除未使用的变量
+    const time = clock.getElapsedTime();
 
     // 缓动旋转
     universeGroup.rotation.y += (targetRotationY - universeGroup.rotation.y) * 0.1;
     universeGroup.rotation.x += (targetRotationX - universeGroup.rotation.x) * 0.1;
+
+    // 增加轻微的有机波动感，让树看起来在流动
+    universeGroup.position.y = Math.sin(time * 0.5) * 0.2;
+    universeGroup.position.x = Math.cos(time * 0.3) * 0.1;
 
     renderer.render(scene, camera);
 }
@@ -410,7 +410,6 @@ function animate() {
 // 【新增】主视角的高亮路径计算：淡化其余分支，点亮主线
 // -------------------------------------------------------------
 export function updateActivePath(targetNodeId, universeTreeData) {
-    // 1. 回溯找到完整的血脉链
     const activePathSet = new Set();
     let curr = targetNodeId;
     while (curr) {
@@ -419,27 +418,25 @@ export function updateActivePath(targetNodeId, universeTreeData) {
         curr = nodeObj ? nodeObj.parent_id : null;
     }
 
-    // 2. 遍历更改所有 Node 和 Branch 的材质亮度
     Object.keys(nodeVisuals).forEach(id => {
         const isActive = activePathSet.has(id);
-        const mat = nodeVisuals[id].material;
+        const node = nodeVisuals[id];
 
-        gsap.to(mat, {
-            opacity: isActive ? 1.0 : 0.15,
-            emissiveIntensity: isActive ? 0.8 : 0.1,
-            duration: 0.5
+        // 节点高亮：增加非活跃节点的可见度从 0.2 -> 0.4
+        gsap.to(node.material, {
+            opacity: isActive ? 1.0 : 0.4,
+            size: isActive ? 1.2 : 0.75,
+            duration: 0.6
         });
 
-        // 如果该节点对应有进入的管线
         if (branchVisuals[id]) {
-            const bMat = branchVisuals[id].material;
-            gsap.to(bMat, {
-                opacity: isActive ? 0.8 : 0.05,
-                duration: 0.5
+            const branch = branchVisuals[id];
+            gsap.to(branch.material, {
+                opacity: isActive ? 0.8 : 0.25, // 从 0.1 -> 0.25
+                duration: 0.6
             });
         }
     });
 
-    // 顺便让镜头飘向该节点
     highlightNode(targetNodeId, true);
 }

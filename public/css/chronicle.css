@@ -1,0 +1,53 @@
+/* Chronicle Panel (Story Log) Styles */
+#chronicle-panel {
+    /* Layout handled by universe.css */
+    display: flex;
+    flex-direction: column;
+}
+
+#chronicle-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    font-size: 0.98rem;
+    line-height: 1.7;
+    color: #333;
+}
+
+/* Custom Scrollbar for Chronicle */
+#chronicle-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chronicle-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chronicle-content::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 3px;
+}
+
+.log-entry {
+    background: rgba(255, 255, 255, 0.4);
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s;
+}
+
+.log-entry:hover {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.log-entry.system-msg {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    background: none;
+    border: none;
+}

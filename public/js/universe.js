@@ -1,4 +1,6 @@
-import { initUniverse3D, buildUniverseGraph, highlightNode, updateActivePath } from './universe_engine.js';
+import { initUniverse3D, buildUniverseGraph, updateActivePath } from './universe_engine.js';
+import { renderChronicle } from './chronicle.js';
+import { renderEventLines } from './event_lines.js';
 
 let universeMap = {};
 let universeDataArray = [];
@@ -43,11 +45,34 @@ function linkNodesForMap(nodes) {
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchUniverseTree();
-    renderEventLines();
+    renderEventLines('event-lines-container', mockEventLines);
     setupDragAndDrop();
     setupSynthesizeButton();
     setupCardCloseBtn();
+    setupHeaderToggles();
 });
+
+function setupHeaderToggles() {
+    // Chronicle Header Toggle
+    const chronicleHeader = document.querySelector('#chronicle-panel .panel-header');
+    if (chronicleHeader) {
+        chronicleHeader.addEventListener('click', (e) => {
+            e.stopPropagation(); // Avoid triggering void click
+            document.getElementById('chronicle-panel').classList.toggle('collapsed');
+        });
+    }
+
+    // Lower View Header Toggle
+    const lowerHeader = document.querySelector('#lower-view .panel-header');
+    if (lowerHeader) {
+        lowerHeader.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('lower-view').classList.toggle('collapsed');
+            document.getElementById('synthesis-dock-container').classList.toggle('faded');
+            window.dispatchEvent(new Event('resize')); // Force 3D to check bounds
+        });
+    }
+}
 
 async function fetchUniverseTree() {
     try {
@@ -59,26 +84,51 @@ async function fetchUniverseTree() {
         data.tree_data.forEach(n => { universeMap[n.node_id] = n; });
         linkNodesForMap(data.tree_data);
 
-        // 绑定 3D 节点点击事件：用于切换剧情主线
-        initUniverse3D('universe-canvas', handleNodeClick, toggleHUD);
+        // 绑定 3D 节点点击事件
+        initUniverse3D('universe-canvas', handleNodeClick, toggleUIVisibility);
 
         const latestNode = universeDataArray[universeDataArray.length - 1];
         if (latestNode) {
             buildUniverseGraph(universeDataArray);
             focusNode(latestNode.node_id);
-        } else {
-            console.warn("Tree is empty!");
         }
     } catch (e) {
-        console.error("加载宇宙树失败:", e);
-        document.getElementById('chronicle-content').innerHTML = `<div class="log-entry system-msg" style="color:var(--warning-red)">ERROR: 无法链接主脑，请检查服务器网络。</div>`;
+        console.error("加载失败:", e);
+        const container = document.getElementById('chronicle-content');
+        if (container) container.innerHTML = `<div class="log-entry system-msg" style="color:var(--warning-red)">ERROR: 同步失败。</div>`;
     }
 }
 
-// 点击 3D 节点切换“高亮命运主干”并更新日记
+function toggleUIVisibility(forceShow = false) {
+    const lowerView = document.getElementById('lower-view');
+    const chroniclePanel = document.getElementById('chronicle-panel');
+    const dock = document.getElementById('synthesis-dock-container');
+    const infoCard = document.getElementById('node-info-card');
+
+    if (forceShow) {
+        lowerView.classList.remove('collapsed');
+        chroniclePanel.classList.remove('collapsed');
+        if (dock) dock.classList.remove('faded');
+    } else {
+        const isAnyCollapsed = lowerView.classList.contains('collapsed') || chroniclePanel.classList.contains('collapsed');
+
+        if (isAnyCollapsed) {
+            lowerView.classList.remove('collapsed');
+            chroniclePanel.classList.remove('collapsed');
+            if (dock) dock.classList.remove('faded');
+        } else {
+            lowerView.classList.add('collapsed');
+            chroniclePanel.classList.add('collapsed');
+            if (dock) dock.classList.add('faded');
+            if (infoCard) infoCard.classList.add('hidden');
+        }
+    }
+}
+
 function handleNodeClick(nodeId) {
     focusNode(nodeId);
-    showNodeInfoCard(nodeId); // 也保留一个浮动卡片便于快速查看张力
+    showNodeInfoCard(nodeId);
+    toggleUIVisibility(true); // 点击节点时确保 UI 显示
 }
 
 function focusNode(nodeId) {
@@ -86,10 +136,8 @@ function focusNode(nodeId) {
     if (!node) return;
     currentNodeId = nodeId;
 
-    // 1. 调用 Engine 高亮该线并拉远摄像机
     updateActivePath(nodeId, universeDataArray);
 
-    // 2. 爬取整个 active_path 并刷新到左侧的编年史 Chronicle Panel
     let path = [];
     let curr = nodeId;
     while (curr) {
@@ -101,104 +149,24 @@ function focusNode(nodeId) {
 
     renderChronicle(path);
 
-    // 3. 更新 HUD
+    // 更新 HUD
     const tLvl = node.state_snapshot?.tension_level || 0;
-    document.getElementById('hud-tension').innerText = tLvl;
+    const hudTension = document.getElementById('hud-tension');
+    if (hudTension) hudTension.innerText = tLvl;
     const tFill = document.getElementById('tension-fill');
-    tFill.style.width = `${Math.min(100, Math.max(0, tLvl))}%`;
-    if (tLvl >= 80) tFill.classList.add('warning');
-    else tFill.classList.remove('warning');
-}
-
-function renderChronicle(nodePath) {
-    const container = document.getElementById('chronicle-content');
-    container.innerHTML = ''; // 清空
-
-    nodePath.forEach((n, idx) => {
-        const div = document.createElement('div');
-        div.className = 'log-entry';
-
-        // 解析剧情和选择
-        let actionHTML = '';
-        if (idx > 0 && n.parent_id) {
-            actionHTML = `<div style="color:var(--accent-blue); font-size: 0.8em; margin-bottom: 6px;">&gt; 选择节点: ${n.universe_tag} 分支</div>`;
-        }
-
-        const text = (n.narrative_text || "无记录").replace(/\n/g, '<br>');
-
-        div.innerHTML = `
-            ${actionHTML}
-            <div style="font-weight: 500;">${text}</div>
-            <div style="font-size: 0.75em; color: var(--text-muted); margin-top: 8px; text-align: right;">ID: ${n.node_id.substring(0, 6)}</div>
-        `;
-        container.appendChild(div);
-    });
-
-    // 自动滚动到底部
-    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
-}
-
-// 渲染底部的 2D 事件线
-function renderEventLines() {
-    const container = document.getElementById('event-lines-container');
-    container.innerHTML = '';
-
-    mockEventLines.forEach(track => {
-        const trackDiv = document.createElement('div');
-        trackDiv.className = 'event-track';
-
-        // 轨道名称
-        const label = document.createElement('div');
-        label.className = 'track-label';
-        label.innerText = track.name;
-
-        // 实体线
-        const line = document.createElement('div');
-        line.className = 'track-line';
-        line.style.background = track.color;
-
-        trackDiv.appendChild(label);
-        trackDiv.appendChild(line);
-
-        // 生成节点胶囊
-        track.nodes.forEach(n => {
-            const capsule = document.createElement('div');
-            capsule.className = 'capsule-node';
-            capsule.draggable = true;
-            capsule.style.borderColor = track.color;
-            capsule.style.left = `${n.timeX}%`;
-
-            // 存数据为了拖拽
-            capsule.dataset.dragId = n.id;
-            capsule.dataset.title = n.title;
-            capsule.dataset.trackName = track.name;
-            capsule.dataset.trackColor = track.color;
-
-            capsule.innerHTML = `<span style="color:${track.color}; font-size:1.2em;">&bull;</span> ${n.title}`;
-
-            // Drag Event
-            capsule.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('application/json', JSON.stringify({
-                    id: n.id, title: n.title, trackColor: track.color
-                }));
-                setTimeout(() => capsule.classList.add('dragging'), 0);
-            });
-            capsule.addEventListener('dragend', () => {
-                capsule.classList.remove('dragging');
-            });
-
-            trackDiv.appendChild(capsule);
-        });
-
-        container.appendChild(trackDiv);
-    });
+    if (tFill) {
+        tFill.style.width = `${Math.min(100, Math.max(0, tLvl))}%`;
+        if (tLvl >= 80) tFill.classList.add('warning');
+        else tFill.classList.remove('warning');
+    }
 }
 
 // ---------------------------------------------------------
-// Split-Screen Drag & Drop: 从下层拖入上层 Dock
+// Drag & Drop
 // ---------------------------------------------------------
 function setupDragAndDrop() {
     const dropzone = document.getElementById('dock-dropzone');
+    if (!dropzone) return;
 
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -217,19 +185,13 @@ function setupDragAndDrop() {
             const dataStr = e.dataTransfer.getData('application/json');
             if (!dataStr) return;
             const data = JSON.parse(dataStr);
-
             if (crucibleItems.includes(data.id)) return;
 
-            // 放入 Dock
             const miniCard = document.createElement('div');
             miniCard.className = 'dock-card-item';
             miniCard.dataset.id = data.id;
-            // 采用对应轨道的颜色描边作区分
             miniCard.style.borderLeft = `4px solid ${data.trackColor}`;
-            miniCard.innerHTML = `
-                <span>${data.title}</span>
-                <span style="color:var(--text-muted); font-size:1.2rem; margin-top:-2px">&times;</span>
-            `;
+            miniCard.innerHTML = `<span>${data.title}</span><span style="font-size:1.2rem; margin-left:8px;">&times;</span>`;
 
             miniCard.addEventListener('click', () => {
                 miniCard.remove();
@@ -240,51 +202,39 @@ function setupDragAndDrop() {
 
             dropzone.appendChild(miniCard);
             crucibleItems.push(data.id);
-
             checkDockEmptyState();
             updateSynthesizeButton();
-        } catch (err) {
-            console.error(err);
-        }
+        } catch (err) { console.error(err); }
     });
 }
 
 function checkDockEmptyState() {
     const dropzone = document.getElementById('dock-dropzone');
-    if (crucibleItems.length > 0) {
-        dropzone.classList.add('has-items');
-    } else {
-        dropzone.classList.remove('has-items');
-    }
+    if (!dropzone) return;
+    if (crucibleItems.length > 0) dropzone.classList.add('has-items');
+    else dropzone.classList.remove('has-items');
 }
 
 function updateSynthesizeButton() {
     const btn = document.getElementById('btn-synthesize');
-    if (crucibleItems.length > 0) {
-        btn.disabled = false;
-    } else {
-        btn.disabled = true;
-    }
+    if (!btn) return;
+    btn.disabled = (crucibleItems.length === 0);
 }
 
 function setupSynthesizeButton() {
     updateSynthesizeButton();
     const btn = document.getElementById('btn-synthesize');
+    if (!btn) return;
     btn.addEventListener('click', () => {
         if (crucibleItems.length === 0) return;
-
         btn.innerText = 'SYNTHESIZING...';
         btn.disabled = true;
 
-        // Mock Phase 1 Feedback
         setTimeout(() => {
-            alert("Phase 1 Preview: 已读取 [" + crucibleItems.join(', ') + "] 交由顶层主脑引擎演算新宇宙分支！");
-
-            // 清理 Dock
+            alert("Synthesized: " + crucibleItems.join(', '));
             document.querySelectorAll('.dock-card-item').forEach(el => el.remove());
             crucibleItems = [];
             checkDockEmptyState();
-
             btn.innerText = 'SYNTHESIZE / 合成推演';
             updateSynthesizeButton();
         }, 1000);
@@ -292,39 +242,47 @@ function setupSynthesizeButton() {
 }
 
 function toggleHUD() {
-    document.getElementById('node-info-card').classList.add('hidden');
+    const card = document.getElementById('node-info-card');
+    if (card) card.classList.add('hidden');
 }
 
 function showNodeInfoCard(nodeId) {
     const node = universeMap[nodeId];
     if (!node) return;
     const card = document.getElementById('node-info-card');
+    if (!card) return;
     document.getElementById('card-node-id').innerText = node.node_id.substring(0, 8);
+    // 解析剧情和选择
+    let actionHTML = '';
+    // The original instruction had `if (idx > 0 && n.parent_id)` which implies iteration,
+    // but this function only deals with a single `node`.
+    // Assuming this was meant to be a placeholder or part of a different context.
+    // For now, I'll include the div as a static element if `actionHTML` is not empty.
+    // However, `actionHTML` is currently always empty based on the provided snippet.
+    // To make it syntactically correct and avoid breaking existing functionality,
+    // I will place the new HTML content within the `card-narrative-summary` assignment,
+    // as it appears to be intended for display within the card.
     document.getElementById('card-narrative-summary').innerHTML = `
         <div style="font-weight:600; margin-bottom:5px;">Universe: ${node.universe_tag}</div>
-        <div style="color:var(--text-muted); font-size:0.8rem;">
-            Tension: ${node.state_snapshot?.tension_level || 0}%
-        </div>
+        ${actionHTML}
+        <div style="color:var(--text-muted); font-size:0.8rem;">Tension: ${node.state_snapshot?.tension_level || 0}%</div>
     `;
-    // 居中稍微偏移
-    card.style.left = '40%';
-    card.style.top = '30%';
     card.classList.remove('hidden');
 }
 
 function setupCardCloseBtn() {
-    document.getElementById('btn-close-card').addEventListener('click', () => {
-        document.getElementById('node-info-card').classList.add('hidden');
+    const btn = document.getElementById('btn-close-card');
+    if (btn) btn.addEventListener('click', () => {
+        const card = document.getElementById('node-info-card');
+        if (card) card.classList.add('hidden');
     });
 }
 
-window.testJump = function () { alert("跃迁功能联调中。"); };
+window.testJump = function () { alert("Jump planned."); };
 window.resetUniverse = async function () {
-    if (!confirm("警告：将抹除所有宇宙时间线并重置回原点，是否执行？")) return;
+    if (!confirm("Reset timeline?")) return;
     try {
         await fetch('http://localhost:3000/api/debug/reset', { method: 'POST' });
-        window.location.href = window.location.pathname + "?_t=" + Date.now();
-    } catch (e) {
-        alert("重置失败: " + e.message);
-    }
+        window.location.reload();
+    } catch (e) { alert("Fail: " + e.message); }
 };

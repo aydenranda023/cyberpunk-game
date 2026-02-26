@@ -1,0 +1,103 @@
+/* 2D Event Lines Subway Map Styles */
+#lower-view {
+    /* Layout handled by universe.css */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#event-lines-container {
+    flex: 1;
+    position: relative;
+    padding: 40px;
+    transition: opacity 0.3s;
+    /* Drawing grid lines - Sparser: 250px instead of 100px */
+    background-image: linear-gradient(to right, var(--border-light) 1px, transparent 1px);
+    background-size: 250px 100%;
+}
+
+#lower-view.collapsed #ev-tracks-container {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.event-track {
+    position: relative;
+    height: 80px;
+    display: flex;
+    align-items: center;
+}
+
+.track-line {
+    position: absolute;
+    left: 0;
+    right: -1000px;
+    /* Long horizontal line */
+    height: 2px;
+    /* Thinner line */
+    border-radius: 1px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.8;
+    /* Higher opacity to match solid nodes */
+    z-index: 1;
+}
+
+.track-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.capsule-node {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    transform: translateY(-50%);
+    background: currentColor;
+    /* Matches node color (set via inline style or class) */
+    color: white !important;
+    /* Force white text */
+    border: none;
+    /* Solid fill, no border */
+    border-radius: 12px;
+    padding: 4px 12px;
+    /* Smaller and thinner */
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    /* Subtle shadow for readability on bright nodes */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    cursor: grab;
+    user-select: none;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.capsule-node span {
+    display: none;
+    /* Remove the inner dot since it's solid filled */
+}
+
+.capsule-node:hover {
+    transform: translateY(-50%) scale(1.08);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.capsule-node:active {
+    cursor: grabbing;
+    transform: translateY(-50%) scale(0.95);
+}
+
+.capsule-node.dragging {
+    opacity: 0.5;
+}
