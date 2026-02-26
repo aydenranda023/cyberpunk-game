@@ -182,23 +182,34 @@ function setupDragAndDrop() {
             const dataStr = e.dataTransfer.getData('application/json');
             if (!dataStr) return;
             const data = JSON.parse(dataStr);
-            if (crucibleItems.includes(data.id)) return;
+            // 如果该时间线已经有节点在合成釜中，需要替换掉旧的
+            const existingTrackIndex = crucibleItems.findIndex(i => i.id === data.id);
+            if (existingTrackIndex !== -1) {
+                // 如果是同一个节点，直接返回
+                if (crucibleItems[existingTrackIndex].nodeId === data.nodeId) return;
+
+                const existingNodeId = crucibleItems[existingTrackIndex].nodeId;
+                const oldCard = dropzone.querySelector(`[data-node-id="${existingNodeId}"]`);
+                if (oldCard) oldCard.remove();
+                crucibleItems.splice(existingTrackIndex, 1);
+            }
 
             const miniCard = document.createElement('div');
             miniCard.className = 'dock-card-item';
             miniCard.dataset.id = data.id;
+            miniCard.dataset.nodeId = data.nodeId;
             miniCard.style.borderLeft = `4px solid ${data.trackColor}`;
-            miniCard.innerHTML = `<span>${data.title}</span><span style="font-size:1.2rem; margin-left:8px;">&times;</span>`;
+            miniCard.innerHTML = `<span class="truncate-text" title="${data.title}">${data.title}</span><span class="remove-btn" style="font-size:1.2rem; margin-left:8px;">&times;</span>`;
 
             miniCard.addEventListener('click', () => {
                 miniCard.remove();
-                crucibleItems = crucibleItems.filter(i => i !== data.id);
+                crucibleItems = crucibleItems.filter(i => i.nodeId !== data.nodeId);
                 checkDockEmptyState();
                 updateSynthesizeButton();
             });
 
             dropzone.appendChild(miniCard);
-            crucibleItems.push(data.id);
+            crucibleItems.push({ id: data.id, nodeId: data.nodeId });
             checkDockEmptyState();
             updateSynthesizeButton();
         } catch (err) { console.error(err); }
@@ -228,20 +239,16 @@ function setupSynthesizeButton() {
         btn.disabled = true;
 
         try {
-            // Collect parent node IDs for each involved track
-            // In Phase 2, we use the latest node from each involved track
-            const parentNodeIds = crucibleItems.map(tid => {
-                // Find the latest node that involved this track
-                const trackNodes = universeDataArray.filter(n => n.involved_tracks && n.involved_tracks.includes(tid));
-                return trackNodes.length > 0 ? trackNodes[trackNodes.length - 1].node_id : "genesis_000";
-            });
+            // parent_node_ids defaults to genesis if no nodeId is somehow found, but since we drag nodes, nodeId should be present.
+            const parentNodeIds = crucibleItems.map(item => item.nodeId);
+            const involvedTracks = crucibleItems.map(item => item.id);
 
             const res = await fetch(`${API_BASE}/api/action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     parent_node_ids: [...new Set(parentNodeIds)], // Unique parents
-                    involved_tracks: crucibleItems,
+                    involved_tracks: [...new Set(involvedTracks)], // Unique tracks
                     player_action: "进行高维合成反应"
                 })
             });

@@ -291,12 +291,24 @@ app.get('/api/debug/tree', async (req, res) => {
             id: trackId,
             name: trackDef.name,
             color: trackDef.color,
-            nodes: trackNodes.map((n, index) => ({
-                id: n.node_id,
-                title: n.state_snapshot?.tracks_state?.[trackId] || (index === 0 ? trackDef.current_state : "状态更新"),
-                // Generate a generic sequential timeX for layout purposes (can be improved later)
-                timeX: 10 + (index * 25)
-            }))
+            nodes: trackNodes.map((n, index) => {
+                let nodeTitle = n.state_snapshot?.tracks_state?.[trackId];
+                if (!nodeTitle) {
+                    if (index === 0) {
+                        nodeTitle = trackDef.current_state;
+                    } else {
+                        // 寻找尽可能有意义的文本作为状态显示，截取前10个字
+                        const fallbackText = n.director_notes || n.narrative_text || "状态演进";
+                        nodeTitle = fallbackText.substring(0, 10) + "...";
+                    }
+                }
+                return {
+                    id: n.node_id,
+                    title: nodeTitle,
+                    // Generate a generic sequential timeX for layout purposes (can be improved later)
+                    timeX: 10 + (index * 25)
+                };
+            })
         };
     });
 

@@ -329,8 +329,23 @@ body {
     font-size: 0.75rem;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     cursor: pointer;
+    max-width: 100%;
+}
+
+.truncate-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+    /* restrict width so multiple cards can fit */
+    display: inline-block;
+}
+
+.remove-btn {
+    flex-shrink: 0;
 }
 
 .dock-card-item:hover {

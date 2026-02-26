@@ -45,7 +45,7 @@ export function renderEventLines(containerId, mockEventLines) {
             // Drag Event
             capsule.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('application/json', JSON.stringify({
-                    id: n.id, title: n.title, trackColor: track.color
+                    id: track.id, nodeId: n.id, title: n.title, trackColor: track.color
                 }));
                 // 必须异步添加类名，否则拖拽镜像也会变暗
                 setTimeout(() => capsule.classList.add('dragging'), 0);
