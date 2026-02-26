@@ -19,24 +19,57 @@ app.use(express.static('public'));
 let universeTree = [];
 
 // 【根节点初始化】(仅供示例测试用)
-// 游戏服务器启动时放入一个创世节点作为起点
 const genesisNode = {
-    node_id: "genesis_001",
+    node_id: "genesis_000",
     parent_id: null,
     universe_tag: "Cyberpunk",
     state_snapshot: {
         global_summary: "故事从夜之城的一个雨夜开始...",
         tension_level: 10,
-        current_objective: "生存下去",
-        key_facts: []
+        current_objective: "生存下去"
     },
-    narrative_text: "霓虹灯闪烁，你站在阴暗的巷口，雨水刷洗着你破碎的义体...",
-    player_status: {
-        hp: 100,
-        inventory: []
-    }
+    narrative_text: "雨水打在街角闪烁的霓虹招牌上，你刚刚脱离了荒坂的追捕。在这个十字路口，三条微弱的信号正在你的神经链路中闪烁。",
+    player_status: { hp: 100 }
 };
-universeTree.push(genesisNode);
+
+// 构造后续测试树节点以显示分支
+const testNode1 = {
+    node_id: "node_test_001",
+    parent_id: "genesis_000",
+    universe_tag: "Cyberpunk",
+    state_snapshot: { tension_level: 25, current_objective: "寻找避难所" },
+    narrative_text: "你选择向左拐入黑客聚集的小巷（蓝色轨道：人物线）。在这里你遇到了中间人 Dex。",
+    player_status: { hp: 100 }
+};
+
+const testNode2 = {
+    node_id: "node_test_002",
+    parent_id: "genesis_000",
+    universe_tag: "Cyberpunk",
+    state_snapshot: { tension_level: 40, current_objective: "调查废墟" },
+    narrative_text: "你径直走向了远方的高塔（橙色轨道：地点线），那里曾是旧日集团的研究所废墟。",
+    player_status: { hp: 100 }
+};
+
+const testNode3 = {
+    node_id: "node_test_003",
+    parent_id: "node_test_001",
+    universe_tag: "Cyberpunk",
+    state_snapshot: { tension_level: 55, current_objective: "破解芯片" },
+    narrative_text: "Dex 递给你一块加密芯片（绿色轨道：物品线）。你接过了它，开始尝试破解里面的防火墙。",
+    player_status: { hp: 100 }
+};
+
+const testNode4 = {
+    node_id: "node_test_004",
+    parent_id: "node_test_003",
+    universe_tag: "Wasteland", // 测试一下变异世界颜色
+    state_snapshot: { tension_level: 80, current_objective: "逃脱思维腐蚀" },
+    narrative_text: "芯片中潜藏着致命的守护程序！你的意识被强行拉扯，坠入了一片精神荒原。周围是漫天的辐射尘埃...",
+    player_status: { hp: 60 }
+};
+
+universeTree.push(genesisNode, testNode1, testNode2, testNode3, testNode4);
 
 
 // 核心算法：上下文溯源机制 (Context Retrieval)
@@ -211,8 +244,8 @@ ${specialRules}
 
 // 辅助路由：重置并清空宇宙树 (从零开始)
 app.post('/api/debug/reset', (req, res) => {
-    universeTree = [genesisNode];
-    res.json({ success: true, message: "宇宙已重启" });
+    universeTree = [genesisNode, testNode1, testNode2, testNode3, testNode4];
+    res.json({ success: true, message: "宇宙已重置为测试初始状态" });
 });
 
 // 辅助路由：方便开发者在浏览器里直接查看 universeTree 的全貌

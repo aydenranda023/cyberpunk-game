@@ -12,17 +12,18 @@ let targetRotationX = 0, targetRotationY = 0;
 
 // Nodes maps
 const nodeMeshes = {}; // 隐形碰撞体映射（用于点击）: nodeId => Mesh
-const nodeVisuals = {}; // 发光点云映射（用于视觉放大）: nodeId => Points
+const nodeVisuals = {}; // 渲染材质映射: nodeId => Mesh
+const branchVisuals = {}; // 渲染管线映射: childNodeId => Mesh
 const nodePositions = {}; // 空间坐标： nodeId => THREE.Vector3
 
-// 材质配置
-const hitGeometry = new THREE.SphereGeometry(1.5, 8, 8); // 稍微放大隐形碰撞体，方便点选
+// 材质配置：苹果风格极简管线与白金节点
+const hitGeometry = new THREE.SphereGeometry(1.5, 8, 8);
 const hitMaterial = new THREE.MeshBasicMaterial({
-    transparent: true,
-    opacity: 0,
-    depthWrite: false, // 必须关闭深度写入！否则透明球体会遮挡背后的自发光点云
-    colorWrite: false  // 也可以关闭颜色写入，彻底变成理化碰撞体
+    transparent: true, opacity: 0, depthWrite: false
 });
+
+// 使用基础的高分段球体作为地铁站/音符锚点
+const nodeGeometry = new THREE.SphereGeometry(0.3, 32, 32);
 
 // 创造一个圆形的粒子透明贴图
 const canvas2d = document.createElement('canvas');
@@ -36,47 +37,44 @@ ctx.fill();
 const circleTexture = new THREE.CanvasTexture(canvas2d);
 
 function getBranchMaterial(colorHex) {
-    const baseColor = new THREE.Color(0xffffff);
-    const tintColor = new THREE.Color(colorHex);
-    return new THREE.PointsMaterial({
-        color: baseColor.lerp(tintColor, 0.25), // 偏白，混入 25% 宇宙主题色
-        size: 0.06, // 缩小点云
-        map: circleTexture,
+    // 平滑的实体连线材质
+    return new THREE.MeshPhysicalMaterial({
+        color: colorHex,
         transparent: true,
-        opacity: 0.8,
-        alphaTest: 0.1,
-        depthWrite: false, // 恢复关闭深度写入，开启 AdditiveBlending 才能自发光不发黑
-        blending: THREE.AdditiveBlending
+        opacity: 0.6, // 加深透明度让管线更清晰
+        roughness: 0.2,
+        transmission: 0.5,
+        thickness: 0.5
     });
 }
 
 function getNodeMaterial(colorHex) {
-    const baseColor = new THREE.Color(0xffffff);
-    const tintColor = new THREE.Color(colorHex);
-    return new THREE.PointsMaterial({
-        color: baseColor.lerp(tintColor, 0.4), // 混入 40% 宇宙主题色
-        size: 0.1, // 缩小节点点云
-        map: circleTexture,
+    // 干净的发光小球材质，增加基础颜色以防太淡
+    return new THREE.MeshPhysicalMaterial({
+        color: colorHex, // 将颜色填入实体
+        emissive: colorHex,
+        emissiveIntensity: 0.3,
+        roughness: 0.1,
+        metalness: 0.1,
         transparent: true,
         opacity: 1.0,
-        alphaTest: 0.1,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1
     });
 }
 
-// 统一颜色映射
+// 统一颜色映射 (转向柔和但清晰的指示色)
 const UNIVERSE_COLORS = {
-    "Cyberpunk": 0x00e5ff, // 青色
-    "Medieval Fantasy": 0xffaa00, // 橙金
-    "Wasteland": 0xccff00, // 毒绿
-    "default": 0xffffff // 默认白
+    "Cyberpunk": 0x33ccff,    // 清澈蓝
+    "Medieval Fantasy": 0xffaa00, // 琥珀金
+    "Wasteland": 0x33cc66,    // 苍翠绿
+    "default": 0xaaaaaa       // 浅灰
 };
 function getColorForUniverse(tag) {
     return UNIVERSE_COLORS[tag] || UNIVERSE_COLORS["default"];
 }
 
-// 基于时间的Shader材质（用于粒子闪烁和浮动）。为了不引入过复杂 Shader，先用 JS 遍历更新
+// 取消所有点云闪烁逻辑
 const animatedPointClouds = [];
 
 // ==========================================
@@ -85,15 +83,22 @@ const animatedPointClouds = [];
 export function initUniverse3D(canvasId, onNodeClickCallback, onVoidClickCallback) {
     const canvas = document.getElementById(canvasId);
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0c);
-    scene.fog = new THREE.FogExp2(0x0a0a0c, 0.002);
+    scene.background = null;
 
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 15;
-    camera.position.y = 5;
+    // 加强打光
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
+
+    const container = canvas.parentElement;
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(5, 3, 10);
+    camera.lookAt(0, 0, 0);
 
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
 
     setupControls(canvas, onNodeClickCallback, onVoidClickCallback);
@@ -101,7 +106,30 @@ export function initUniverse3D(canvasId, onNodeClickCallback, onVoidClickCallbac
     universeGroup = new THREE.Group();
     scene.add(universeGroup);
 
+    // 移除五线谱： drawStaffLines();
+
     animate();
+}
+
+function drawStaffLines() {
+    // 创造 5 条极淡的灰色管线横贯时空，作为乐谱背景
+    const mat = new THREE.LineBasicMaterial({
+        color: 0xcccccc,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false
+    });
+
+    // Y 轴分布五根线，Z轴轻微推后作为背景
+    const spread = [-4, -2, 0, 2, 4];
+    spread.forEach(yOffset => {
+        const points = [];
+        points.push(new THREE.Vector3(-100, yOffset, -2));
+        points.push(new THREE.Vector3(100, yOffset, -2));
+        const geom = new THREE.BufferGeometry().setFromPoints(points);
+        const line = new THREE.Line(geom, mat);
+        universeGroup.add(line);
+    });
 }
 
 function setupControls(canvas, onClick, onVoidClick) {
@@ -173,8 +201,9 @@ function setupControls(canvas, onClick, onVoidClick) {
         isDragging = false;
         if (hasMoved) return; // 如果发生了有效拖动，就不算点击节点
 
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
         const intersects = raycaster.intersectObjects(Object.values(nodeMeshes));
@@ -188,9 +217,11 @@ function setupControls(canvas, onClick, onVoidClick) {
     });
 
     window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
+        const container = canvas.parentElement;
+        if (!container) return;
+        camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(container.clientWidth, container.clientHeight);
     });
 }
 
@@ -198,56 +229,33 @@ function setupControls(canvas, onClick, onVoidClick) {
 // 图谱生成逻辑
 // ==========================================
 
-function createBranchPointCloud(p1, p2, colorHex) {
-    const dist = p1.distanceTo(p2);
-    const numPoints = Math.floor(dist * 40);
-    const positions = new Float32Array(numPoints * 3);
-    const phases = new Float32Array(numPoints); // 用作明暗闪动偏移
+// ==========================================
+// 图谱生成逻辑：管线与地铁站
+// ==========================================
 
-    for (let i = 0; i < numPoints; i++) {
-        const t = Math.random();
-        const x = p1.x + (p2.x - p1.x) * t;
-        const y = p1.y + (p2.y - p1.y) * t;
-        const z = p1.z + (p2.z - p1.z) * t;
-        const noise = 0.4;
-        positions[i * 3] = x + (Math.random() - 0.5) * noise;
-        positions[i * 3 + 1] = y + (Math.random() - 0.5) * noise;
-        positions[i * 3 + 2] = z + (Math.random() - 0.5) * noise;
-        phases[i] = Math.random() * Math.PI * 2;
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
+function createBranchLine(p1, p2, colorHex) {
+    // 使用贝塞尔曲线使平行轨道在切变时显得平滑
+    const points = [];
+    // 平滑弯曲的轨迹：起点 -> 起点加X位移 -> 终点减X位移 -> 终点
+    const midX = (p1.x + p2.x) / 2;
+    const curve = new THREE.CubicBezierCurve3(
+        p1,
+        new THREE.Vector3(midX, p1.y, p1.z),
+        new THREE.Vector3(midX, p2.y, p2.z),
+        p2
+    );
 
-    const points = new THREE.Points(geom, getBranchMaterial(colorHex));
-    animatedPointClouds.push({ mesh: points, originalPositions: Array.from(positions) });
-    return points;
+    // 生成带厚度的管线而不是单像素的 Line
+    const tubeGeom = new THREE.TubeGeometry(curve, 20, 0.08, 8, false); // 稍微加粗从 0.05 变 0.08
+
+    // 材质
+    const mat = getBranchMaterial(colorHex);
+
+    return new THREE.Mesh(tubeGeom, mat);
 }
 
-function createNodePointCloud(colorHex) { // 不再传入 pos 偏移，而是原点中心建模
-    const numPoints = 150; // 适当减少粒子量
-    const positions = new Float32Array(numPoints * 3);
-    const phases = new Float32Array(numPoints);
-
-    for (let i = 0; i < numPoints; i++) {
-        const u = Math.random();
-        const v = Math.random();
-        const theta = 2 * Math.PI * u;
-        const phi = Math.acos(2 * v - 1);
-        const r = Math.random() * 0.8; // 节点膨大范围恢复到较大
-
-        // 生成相对重心坐标
-        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        positions[i * 3 + 2] = r * Math.cos(phi);
-        phases[i] = Math.random() * Math.PI * 2;
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
-    const points = new THREE.Points(geom, getNodeMaterial(colorHex));
-    animatedPointClouds.push({ mesh: points, originalPositions: Array.from(positions) });
-    return points;
+function createNodeMesh(colorHex) {
+    return new THREE.Mesh(nodeGeometry, getNodeMaterial(colorHex));
 }
 
 // 批量构建初次加载或者跳跃产生的新起点树
@@ -256,28 +264,26 @@ export function buildUniverseGraph(nodesData) {
     const spacingZ = -5.0;
 
     nodesData.forEach((node) => {
-        if (nodePositions[node.node_id]) return; // 已存在的不再绘制
+        if (nodePositions[node.node_id]) return;
 
         let pos = new THREE.Vector3(0, 0, 0);
-        let branchIsJump = false; // 是否为跳跃分支
+        let branchIsJump = false;
 
         if (node.parent_id && nodePositions[node.parent_id]) {
             const parentPos = nodePositions[node.parent_id];
 
-            // 如果 parent 存在，但这个 node 的 universe_tag 突变，说明它是个 jump 新世界源头
-            // 给它一个巨大的平移，视觉上隔离
             const isJumpNode = node.action_type === 'jump' ||
                 (nodesData.find(n => n.node_id === node.parent_id)?.universe_tag !== node.universe_tag);
 
             if (isJumpNode) {
-                // 距离拉远，形成新树枝簇
-                pos.set(parentPos.x + 20.0, parentPos.y + (Math.random() - 0.5) * 10, parentPos.z + spacingZ);
+                // 维度跳跃大分支
+                pos.set(parentPos.x + 10.0, parentPos.y + (Math.random() - 0.5) * 10, parentPos.z + spacingZ - 5);
                 branchIsJump = true;
             } else {
-                // 正常同宇宙分叉
-                const offsetX = (Math.random() - 0.5) * 8.0;
-                const offsetY = (Math.random() - 0.5) * 8.0;
-                pos.set(parentPos.x + offsetX, parentPos.y + offsetY, parentPos.z + spacingZ);
+                // 神经网络分支：向前上方/下方/侧面微弱分叉
+                const offsetY = (Math.random() - 0.5) * 4.0;
+                const offsetZ = (Math.random() - 0.5) * 4.0;
+                pos.set(parentPos.x + 5.0, parentPos.y + offsetY, parentPos.z + offsetZ);
             }
         }
 
@@ -292,16 +298,17 @@ export function buildUniverseGraph(nodesData) {
         nodeMeshes[node.node_id] = hitMesh;
 
         // 节点视觉
-        const visualNode = createNodePointCloud(color);
-        visualNode.position.copy(pos); // 通过给 mesh 赋予坐标，而非定死在几何体里
+        const visualNode = createNodeMesh(color);
+        visualNode.position.copy(pos);
         universeGroup.add(visualNode);
         nodeVisuals[node.node_id] = visualNode;
 
-        // 生成树枝
+        // 生成管线树枝
         if (node.parent_id && nodePositions[node.parent_id]) {
             if (!branchIsJump) {
-                const branch = createBranchPointCloud(nodePositions[node.parent_id], pos, color);
+                const branch = createBranchLine(nodePositions[node.parent_id], pos, color);
                 universeGroup.add(branch);
+                branchVisuals[node.node_id] = branch;
             }
         }
     });
@@ -315,19 +322,19 @@ export function appendNewNode(newNode, oldNodeObj) {
     let pos = new THREE.Vector3();
     let branchIsJump = false;
 
-    // Jump 逻辑判断：如果类型是 jump 或者标签变了
     if (newNode.action_type === 'jump' || (oldNodeObj && oldNodeObj.universe_tag !== newNode.universe_tag)) {
         pos.set(
-            parentPos.x + 20.0 * (Math.random() > 0.5 ? 1 : -1),
-            parentPos.y + (Math.random() - 0.5) * 15.0,
-            parentPos.z - 5.0
+            parentPos.x + 10.0,
+            parentPos.y + (Math.random() - 0.5) * 10,
+            parentPos.z - 10.0
         );
         branchIsJump = true;
     } else {
+        // 神经网络分支
         pos.set(
-            parentPos.x + (Math.random() - 0.5) * 8.0,
-            parentPos.y + (Math.random() - 0.5) * 8.0,
-            parentPos.z - 5.0
+            parentPos.x + 5.0,
+            parentPos.y + (Math.random() - 0.5) * 4.0,
+            parentPos.z + (Math.random() - 0.5) * 4.0
         );
     }
 
@@ -340,67 +347,48 @@ export function appendNewNode(newNode, oldNodeObj) {
     universeGroup.add(hitMesh);
     nodeMeshes[newNode.node_id] = hitMesh;
 
-    const visualNode = createNodePointCloud(color);
+    const visualNode = createNodeMesh(color);
     visualNode.position.copy(pos);
-    // 从极小放大，恢复正常的初始尺寸 1
+    // 从极小放大，恢复正常的初始尺寸
     visualNode.scale.set(0.01, 0.01, 0.01);
     gsap.to(visualNode.scale, { x: 1, y: 1, z: 1, duration: 1, ease: "elastic.out(1, 0.5)" });
     universeGroup.add(visualNode);
     nodeVisuals[newNode.node_id] = visualNode;
 
     if (!branchIsJump) {
-        const branch = createBranchPointCloud(parentPos, pos, color);
+        const branch = createBranchLine(parentPos, pos, color);
+        // 管线生长渐显
         branch.material.opacity = 0;
-        gsap.to(branch.material, { opacity: 0.8, duration: 1, delay: 0.5 });
+        gsap.to(branch.material, { opacity: 0.6, duration: 1, delay: 0.5 });
         universeGroup.add(branch);
+        branchVisuals[newNode.node_id] = branch;
     }
 }
 
 // 高亮并选择性移动摄像机
 export function highlightNode(nodeId, moveCamera = false) {
-    // 重置大小 (保持原色，不重置为蓝色，只调低透明度)
-    Object.keys(nodeVisuals).forEach(id => {
-        const visual = nodeVisuals[id];
-        visual.scale.set(1, 1, 1);
-        visual.material.opacity = 0.5;
-        // 如果我们还需要额外样式，可以在这里加
-    });
+    // 这个被重构为更复杂的回溯高亮在外部调用 updateActivePath
+    if (!nodePositions[nodeId]) return;
 
-    const activeVisual = nodeVisuals[nodeId];
-    if (activeVisual) {
-        // 确保高亮时恢复大小
-        activeVisual.scale.set(1, 1, 1);
+    // highlightNode 仅负责移动相机，节点的视觉高亮由 updateActivePath 统一管理
+    if (moveCamera) {
+        const targetPos = new THREE.Vector3();
+        // 使用 nodePositions 获取位置，因为 nodeVisuals 可能尚未完全初始化或动画中
+        targetPos.copy(nodePositions[nodeId]);
 
-        // 停止之前的 GSAP 动画并开启 亮度(opacity) 呼吸，而不是整体缩放
-        gsap.killTweensOf(activeVisual.material);
-        activeVisual.material.opacity = 0.5;
+        const targetZOffset = 18; // 稍微拉远，表现神经网络的纵深全貌
+        const targetXOffset = -5; // 稍偏左，给右侧留点空间
 
-        gsap.to(activeVisual.material, {
-            opacity: 1.0,
-            duration: 0.8,
-            yoyo: true,
-            repeat: -1,
-            ease: "sine.inOut"
+        gsap.to(camera.position, {
+            x: targetPos.x + targetXOffset,
+            y: targetPos.y + 6,
+            z: targetPos.z + targetZOffset,
+            duration: 1.5,
+            ease: "power2.inOut",
+            onUpdate: () => {
+                camera.lookAt(targetPos);
+            }
         });
-
-        if (moveCamera) {
-            const targetPos = new THREE.Vector3();
-            activeVisual.getWorldPosition(targetPos);
-
-            const currentZDist = camera.position.distanceTo(targetPos);
-            const targetZOffset = Math.max(6, Math.min(20, currentZDist));
-
-            gsap.to(camera.position, {
-                x: targetPos.x, // 强制居中对准 X
-                y: targetPos.y, // 强制居中对准 Y
-                z: targetPos.z + targetZOffset,
-                duration: 1.2,
-                ease: "power2.inOut",
-                onUpdate: () => {
-                    camera.lookAt(targetPos);
-                }
-            });
-        }
     }
 }
 
@@ -409,26 +397,49 @@ const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
-    const time = clock.getElapsedTime();
+    // const time = clock.getElapsedTime(); // 移除未使用的变量
 
     // 缓动旋转
     universeGroup.rotation.y += (targetRotationY - universeGroup.rotation.y) * 0.1;
     universeGroup.rotation.x += (targetRotationX - universeGroup.rotation.x) * 0.1;
 
-    // 使点云浮动闪烁
-    animatedPointClouds.forEach(pc => {
-        const positions = pc.mesh.geometry.attributes.position.array;
-        const phases = pc.mesh.geometry.attributes.phase.array;
-        const orig = pc.originalPositions;
+    renderer.render(scene, camera);
+}
 
-        for (let i = 0; i < phases.length; i++) {
-            // 增加粒子的随机运动幅度，使其有如暗网萤火虫般飘忽
-            const offset = Math.sin(time * 1.5 + phases[i]) * 0.08;
-            positions[i * 3 + 1] = orig[i * 3 + 1] + offset;
-            positions[i * 3] = orig[i * 3] + offset * 0.5; // X轴也带点晃动
+// -------------------------------------------------------------
+// 【新增】主视角的高亮路径计算：淡化其余分支，点亮主线
+// -------------------------------------------------------------
+export function updateActivePath(targetNodeId, universeTreeData) {
+    // 1. 回溯找到完整的血脉链
+    const activePathSet = new Set();
+    let curr = targetNodeId;
+    while (curr) {
+        activePathSet.add(curr);
+        const nodeObj = universeTreeData.find(n => n.node_id === curr);
+        curr = nodeObj ? nodeObj.parent_id : null;
+    }
+
+    // 2. 遍历更改所有 Node 和 Branch 的材质亮度
+    Object.keys(nodeVisuals).forEach(id => {
+        const isActive = activePathSet.has(id);
+        const mat = nodeVisuals[id].material;
+
+        gsap.to(mat, {
+            opacity: isActive ? 1.0 : 0.15,
+            emissiveIntensity: isActive ? 0.8 : 0.1,
+            duration: 0.5
+        });
+
+        // 如果该节点对应有进入的管线
+        if (branchVisuals[id]) {
+            const bMat = branchVisuals[id].material;
+            gsap.to(bMat, {
+                opacity: isActive ? 0.8 : 0.05,
+                duration: 0.5
+            });
         }
-        pc.mesh.geometry.attributes.position.needsUpdate = true;
     });
 
-    renderer.render(scene, camera);
+    // 顺便让镜头飘向该节点
+    highlightNode(targetNodeId, true);
 }

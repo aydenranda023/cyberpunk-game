@@ -1,3 +1,4 @@
+node server.js
 为你简单梳理一下我们目前已经完全实现并跑通的核心机制：
 
 DAG 节点数据结构：摒弃了以前的数组叠加，每一回合变成了包含 node_id, parent_id, state_snapshot, narrative_text 的独立树状节点。

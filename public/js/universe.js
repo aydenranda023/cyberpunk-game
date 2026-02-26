@@ -1,12 +1,38 @@
-import { initUniverse3D, buildUniverseGraph, appendNewNode, highlightNode } from './universe_engine.js';
+import { initUniverse3D, buildUniverseGraph, highlightNode, updateActivePath } from './universe_engine.js';
 
-// 存储获取到的整个宇宙树和当前聚焦的节点
 let universeMap = {};
+let universeDataArray = [];
 let currentNodeId = null;
+let crucibleItems = [];
 
-// 根据后台历史数据重建树结构中：父子链接
+// 模拟的 3 条 2D 地铁图数据
+const mockEventLines = [
+    {
+        id: "track_v", name: "CHARACTER // 维（V）", color: "var(--track-char)",
+        nodes: [
+            { id: "e1", title: "记忆苏醒", timeX: 10 },
+            { id: "e2", title: "遭遇伏击", timeX: 35 },
+            { id: "e3", title: "义体过载", timeX: 70 }
+        ]
+    },
+    {
+        id: "track_arasaka", name: "LOCATION // 荒坂塔废墟", color: "var(--track-loc)",
+        nodes: [
+            { id: "e4", title: "底层封锁", timeX: 20 },
+            { id: "e5", title: "数据泄露", timeX: 55 }
+        ]
+    },
+    {
+        id: "track_relic", name: "ITEM // 损坏的 Relic", color: "var(--track-item)",
+        nodes: [
+            { id: "e6", title: "获取芯片", timeX: 15 },
+            { id: "e7", title: "防火墙崩溃", timeX: 50 },
+            { id: "e8", title: "意识融合", timeX: 85 }
+        ]
+    }
+];
+
 function linkNodesForMap(nodes) {
-    // 寻找每个节点的 "children"，这有助于我们在 UI 上判断这里到底发生过什么选择
     nodes.forEach(n => { n.children_ids = []; });
     nodes.forEach(n => {
         if (n.parent_id && universeMap[n.parent_id]) {
@@ -15,220 +41,290 @@ function linkNodesForMap(nodes) {
     });
 }
 
-// ==========================================
-// 1. UI 交互与数据逻辑 (Tap-to-Play)
-// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    fetchUniverseTree();
+    renderEventLines();
+    setupDragAndDrop();
+    setupSynthesizeButton();
+    setupCardCloseBtn();
+});
 
 async function fetchUniverseTree() {
     try {
-        // 防止浏览器贪婪缓存 GET 请求导致重置后仍显示旧宇宙树
         const res = await fetch(`http://localhost:3000/api/debug/tree?_t=${Date.now()}`, { cache: "no-store" });
         const data = await res.json();
 
         universeMap = {};
+        universeDataArray = data.tree_data;
         data.tree_data.forEach(n => { universeMap[n.node_id] = n; });
         linkNodesForMap(data.tree_data);
 
-        const allNodes = Object.values(universeMap);
-        const latestNode = allNodes[allNodes.length - 1];
-
-        // 启动独立分离的 3D 引擎，点击节点时调用 handleNodeClick，点击虚空时调用 toggleHUD
+        // 绑定 3D 节点点击事件：用于切换剧情主线
         initUniverse3D('universe-canvas', handleNodeClick, toggleHUD);
 
+        const latestNode = universeDataArray[universeDataArray.length - 1];
         if (latestNode) {
-            buildUniverseGraph(allNodes); // 批量构建点云树
-            focusNode(latestNode.node_id, true);
+            buildUniverseGraph(universeDataArray);
+            focusNode(latestNode.node_id);
         } else {
             console.warn("Tree is empty!");
         }
     } catch (e) {
         console.error("加载宇宙树失败:", e);
-        document.getElementById('story-content').innerHTML = `<span style="color:red">ERROR: 无法链接主脑，请检查服务器网络。</span>`;
+        document.getElementById('chronicle-content').innerHTML = `<div class="log-entry system-msg" style="color:var(--warning-red)">ERROR: 无法链接主脑，请检查服务器网络。</div>`;
     }
 }
 
-// 处理点击 3D 空间中的节点
+// 点击 3D 节点切换“高亮命运主干”并更新日记
 function handleNodeClick(nodeId) {
-    if (currentNodeId === nodeId) return; // 重复点击
-    // 用户要求：选中历史节点时也要镜头居中
-    focusNode(nodeId, true);
+    focusNode(nodeId);
+    showNodeInfoCard(nodeId); // 也保留一个浮动卡片便于快速查看张力
 }
 
-// 聚焦到某个节点：更新 HUD 和 UI
-function focusNode(nodeId, moveCamera = false) {
+function focusNode(nodeId) {
     const node = universeMap[nodeId];
     if (!node) return;
-
     currentNodeId = nodeId;
 
-    // 1. 更新 Status HUD
-    document.getElementById('hud-universe').innerText = node.universe_tag;
-    document.getElementById('hud-hp').innerText = node.player_status?.hp || 100;
+    // 1. 调用 Engine 高亮该线并拉远摄像机
+    updateActivePath(nodeId, universeDataArray);
 
+    // 2. 爬取整个 active_path 并刷新到左侧的编年史 Chronicle Panel
+    let path = [];
+    let curr = nodeId;
+    while (curr) {
+        if (universeMap[curr]) {
+            path.unshift(universeMap[curr]);
+            curr = universeMap[curr].parent_id;
+        } else break;
+    }
+
+    renderChronicle(path);
+
+    // 3. 更新 HUD
     const tLvl = node.state_snapshot?.tension_level || 0;
     document.getElementById('hud-tension').innerText = tLvl;
     const tFill = document.getElementById('tension-fill');
     tFill.style.width = `${Math.min(100, Math.max(0, tLvl))}%`;
-    if (tLvl >= 80) {
-        tFill.classList.add('warning');
-        document.getElementById('hud-tension').style.color = "var(--warning-color)";
-    } else {
-        tFill.classList.remove('warning');
-        document.getElementById('hud-tension').style.color = "var(--primary-glow)";
-    }
-
-    document.getElementById('hud-objective').innerText = node.state_snapshot?.current_objective || "生存";
-
-    // 2. 更新剧情面板
-    const content = document.getElementById('story-content');
-
-    // 如果这个节点存在孩子，说明历史已经发生过选择分支
-    // 我们找出究竟执行了哪个选择，将其高亮显示出来！
-    let historyText = "";
-    if (node.children_ids.length > 0) {
-        const branches = node.children_ids.map(childId => universeMap[childId]);
-        historyText = `<div style="margin-top: 20px; border-top: 1px solid rgba(0,229,255,0.3); padding-top: 10px;">`;
-        historyText += `<p style="color: rgba(255,255,255,0.5); font-size:12px;">【观测到的时间线分叉】</p>`;
-
-        branches.forEach(child => {
-            // 这里我们没在子节点里记录当时传入的 player_action（Phase2 漏了这字段），
-            // 如果以后后端存了 `child.player_action`，可以直接显示出来。
-            // 现在只能用占位符或者它产生的剧情暗示
-            historyText += `<p><span style="color: var(--primary-glow)">➡ 已走过的路径：领向节点 ${child.node_id.slice(-4)}</span></p>`;
-        });
-        historyText += `</div>`;
-    }
-
-    content.innerHTML = (node.narrative_text || "无记录").replace(/\n/g, '<br>') + historyText;
-    document.getElementById('narrative-panel').scrollTop = document.getElementById('narrative-panel').scrollHeight;
-
-    // 3. 渲染选项
-    // 不管是最新节点还是历史节点，都展示该节点当时真实的 AI choices
-    // 区别在于：如果他是历史节点，他触发的 action_type 会是 'branch' 以便开启新时间线
-    let forceActionType = 'continue';
-    if (node.children_ids && node.children_ids.length > 0) {
-        forceActionType = 'branch'; // 这是一个历史节点，再次做决定意味着分叉
-    }
-
-    if (node.choices && node.choices.length > 0) {
-        renderChoices(node.choices, forceActionType);
-    } else {
-        // Fallback 万一旧数据缺失，给玩家提供两个模拟动作以进行修复
-        renderChoices([
-            { text: "继续深入调查" },
-            { text: "小心查探周边" }
-        ], forceActionType);
-    }
-
-    // 4. 通知 Three.js 引擎只高亮，不一定锁镜头
-    highlightNode(nodeId, moveCamera);
+    if (tLvl >= 80) tFill.classList.add('warning');
+    else tFill.classList.remove('warning');
 }
 
-function renderChoices(choicesArr, forceActionType) {
-    const container = document.getElementById('choices-container');
+function renderChronicle(nodePath) {
+    const container = document.getElementById('chronicle-content');
+    container.innerHTML = ''; // 清空
+
+    nodePath.forEach((n, idx) => {
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+
+        // 解析剧情和选择
+        let actionHTML = '';
+        if (idx > 0 && n.parent_id) {
+            actionHTML = `<div style="color:var(--accent-blue); font-size: 0.8em; margin-bottom: 6px;">&gt; 选择节点: ${n.universe_tag} 分支</div>`;
+        }
+
+        const text = (n.narrative_text || "无记录").replace(/\n/g, '<br>');
+
+        div.innerHTML = `
+            ${actionHTML}
+            <div style="font-weight: 500;">${text}</div>
+            <div style="font-size: 0.75em; color: var(--text-muted); margin-top: 8px; text-align: right;">ID: ${n.node_id.substring(0, 6)}</div>
+        `;
+        container.appendChild(div);
+    });
+
+    // 自动滚动到底部
+    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
+}
+
+// 渲染底部的 2D 事件线
+function renderEventLines() {
+    const container = document.getElementById('event-lines-container');
     container.innerHTML = '';
 
-    choicesArr.forEach(choice => {
-        const btn = document.createElement('button');
-        btn.className = 'cyber-btn';
-        btn.innerText = choice.text;
+    mockEventLines.forEach(track => {
+        const trackDiv = document.createElement('div');
+        trackDiv.className = 'event-track';
 
-        // 使用传入的强制类型（取决于是不是历史节点）
-        btn.onclick = () => submitAction(choice.text, forceActionType);
-        container.appendChild(btn);
+        // 轨道名称
+        const label = document.createElement('div');
+        label.className = 'track-label';
+        label.innerText = track.name;
+
+        // 实体线
+        const line = document.createElement('div');
+        line.className = 'track-line';
+        line.style.background = track.color;
+
+        trackDiv.appendChild(label);
+        trackDiv.appendChild(line);
+
+        // 生成节点胶囊
+        track.nodes.forEach(n => {
+            const capsule = document.createElement('div');
+            capsule.className = 'capsule-node';
+            capsule.draggable = true;
+            capsule.style.borderColor = track.color;
+            capsule.style.left = `${n.timeX}%`;
+
+            // 存数据为了拖拽
+            capsule.dataset.dragId = n.id;
+            capsule.dataset.title = n.title;
+            capsule.dataset.trackName = track.name;
+            capsule.dataset.trackColor = track.color;
+
+            capsule.innerHTML = `<span style="color:${track.color}; font-size:1.2em;">&bull;</span> ${n.title}`;
+
+            // Drag Event
+            capsule.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('application/json', JSON.stringify({
+                    id: n.id, title: n.title, trackColor: track.color
+                }));
+                setTimeout(() => capsule.classList.add('dragging'), 0);
+            });
+            capsule.addEventListener('dragend', () => {
+                capsule.classList.remove('dragging');
+            });
+
+            trackDiv.appendChild(capsule);
+        });
+
+        container.appendChild(trackDiv);
     });
 }
 
-// 玩家点击 Tap-to-Play 按钮提交指令
-async function submitAction(actionText, actionType = 'continue', targetUniverse = null) {
-    if (!actionText || !currentNodeId) return;
+// ---------------------------------------------------------
+// Split-Screen Drag & Drop: 从下层拖入上层 Dock
+// ---------------------------------------------------------
+function setupDragAndDrop() {
+    const dropzone = document.getElementById('dock-dropzone');
 
-    const deck = document.getElementById('choices-container');
-    deck.classList.add('hidden');
-    document.getElementById('loading-indicator').classList.remove('hidden');
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('drag-over');
+    });
 
-    try {
-        const payload = {
-            current_node_id: currentNodeId,
-            player_action: actionText,
-            action_type: actionType
-        };
-        if (targetUniverse) payload.target_universe = targetUniverse;
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('drag-over');
+    });
 
-        const res = await fetch('http://localhost:3000/api/action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
 
-        if (!res.ok) throw new Error("API 请求失败 " + res.status);
-        const data = await res.json();
+        try {
+            const dataStr = e.dataTransfer.getData('application/json');
+            if (!dataStr) return;
+            const data = JSON.parse(dataStr);
 
-        if (data.success && data.node_created) {
-            const newNode = data.node_created;
-            // 更新本地数据关系
-            universeMap[newNode.node_id] = newNode;
-            if (!universeMap[currentNodeId].children_ids) universeMap[currentNodeId].children_ids = [];
-            universeMap[currentNodeId].children_ids.push(newNode.node_id);
-            newNode.children_ids = [];
+            if (crucibleItems.includes(data.id)) return;
 
-            // 通知 3D 渲染器增加节点，附加上旧节点作维度差异判断
-            appendNewNode(newNode, universeMap[currentNodeId]);
+            // 放入 Dock
+            const miniCard = document.createElement('div');
+            miniCard.className = 'dock-card-item';
+            miniCard.dataset.id = data.id;
+            // 采用对应轨道的颜色描边作区分
+            miniCard.style.borderLeft = `4px solid ${data.trackColor}`;
+            miniCard.innerHTML = `
+                <span>${data.title}</span>
+                <span style="color:var(--text-muted); font-size:1.2rem; margin-top:-2px">&times;</span>
+            `;
 
-            // 聚焦到产生的新节点，并且要求摄像机锁定飞过去看特效！
-            focusNode(newNode.node_id, true);
+            miniCard.addEventListener('click', () => {
+                miniCard.remove();
+                crucibleItems = crucibleItems.filter(i => i !== data.id);
+                checkDockEmptyState();
+                updateSynthesizeButton();
+            });
+
+            dropzone.appendChild(miniCard);
+            crucibleItems.push(data.id);
+
+            checkDockEmptyState();
+            updateSynthesizeButton();
+        } catch (err) {
+            console.error(err);
         }
-    } catch (e) {
-        console.error(e);
-        alert("执行指令出错：" + e.message);
-    } finally {
-        document.getElementById('loading-indicator').classList.add('hidden');
-        deck.classList.remove('hidden');
+    });
+}
+
+function checkDockEmptyState() {
+    const dropzone = document.getElementById('dock-dropzone');
+    if (crucibleItems.length > 0) {
+        dropzone.classList.add('has-items');
+    } else {
+        dropzone.classList.remove('has-items');
     }
 }
 
-// 暴露给跳跃按钮的测试方法
-window.testJump = function () {
-    const uni = prompt("请输入你想强行跳跃的宇宙维度 (例如: Medieval Fantasy, Wasteland):", "Wasteland");
-    if (uni) {
-        submitAction("我强行开启了传送枪跨越了宇宙边界！", "jump", uni);
+function updateSynthesizeButton() {
+    const btn = document.getElementById('btn-synthesize');
+    if (crucibleItems.length > 0) {
+        btn.disabled = false;
+    } else {
+        btn.disabled = true;
     }
-};
+}
 
-window.submitCustomAction = function () {
-    const input = document.getElementById('action-input');
-    if (input.value.trim()) {
-        const actionType = (universeMap[currentNodeId]?.children_ids?.length > 0) ? 'branch' : 'continue';
-        submitAction(input.value.trim(), actionType);
-        input.value = '';
-    }
-};
+function setupSynthesizeButton() {
+    updateSynthesizeButton();
+    const btn = document.getElementById('btn-synthesize');
+    btn.addEventListener('click', () => {
+        if (crucibleItems.length === 0) return;
 
+        btn.innerText = 'SYNTHESIZING...';
+        btn.disabled = true;
+
+        // Mock Phase 1 Feedback
+        setTimeout(() => {
+            alert("Phase 1 Preview: 已读取 [" + crucibleItems.join(', ') + "] 交由顶层主脑引擎演算新宇宙分支！");
+
+            // 清理 Dock
+            document.querySelectorAll('.dock-card-item').forEach(el => el.remove());
+            crucibleItems = [];
+            checkDockEmptyState();
+
+            btn.innerText = 'SYNTHESIZE / 合成推演';
+            updateSynthesizeButton();
+        }, 1000);
+    });
+}
+
+function toggleHUD() {
+    document.getElementById('node-info-card').classList.add('hidden');
+}
+
+function showNodeInfoCard(nodeId) {
+    const node = universeMap[nodeId];
+    if (!node) return;
+    const card = document.getElementById('node-info-card');
+    document.getElementById('card-node-id').innerText = node.node_id.substring(0, 8);
+    document.getElementById('card-narrative-summary').innerHTML = `
+        <div style="font-weight:600; margin-bottom:5px;">Universe: ${node.universe_tag}</div>
+        <div style="color:var(--text-muted); font-size:0.8rem;">
+            Tension: ${node.state_snapshot?.tension_level || 0}%
+        </div>
+    `;
+    // 居中稍微偏移
+    card.style.left = '40%';
+    card.style.top = '30%';
+    card.classList.remove('hidden');
+}
+
+function setupCardCloseBtn() {
+    document.getElementById('btn-close-card').addEventListener('click', () => {
+        document.getElementById('node-info-card').classList.add('hidden');
+    });
+}
+
+window.testJump = function () { alert("跃迁功能联调中。"); };
 window.resetUniverse = async function () {
     if (!confirm("警告：将抹除所有宇宙时间线并重置回原点，是否执行？")) return;
     try {
         await fetch('http://localhost:3000/api/debug/reset', { method: 'POST' });
-        // 强制带时间戳刷新页面，避免 HTML 缓存
         window.location.href = window.location.pathname + "?_t=" + Date.now();
     } catch (e) {
         alert("重置失败: " + e.message);
     }
 };
-
-// 【沉浸态切换控制】
-function toggleHUD() {
-    const uiElements = [document.getElementById('narrative-panel'), document.getElementById('status-hud'), document.getElementById('action-deck'), document.getElementById('top-controls')];
-    const isHidden = uiElements[0].style.opacity === '0';
-    uiElements.forEach(el => {
-        el.style.opacity = isHidden ? '1' : '0';
-        el.style.pointerEvents = isHidden ? 'auto' : 'none';
-    });
-}
-
-
-// ==========================================
-// 启动
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    fetchUniverseTree();
-});
