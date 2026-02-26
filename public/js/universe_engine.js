@@ -305,14 +305,16 @@ export function buildUniverseGraph(nodesData) {
         universeGroup.add(visualNode);
         nodeVisuals[node.node_id] = visualNode;
 
-        // 生成管线树枝
-        if (node.parent_id && nodePositions[node.parent_id]) {
-            if (!branchIsJump) {
-                const branch = createBranchLine(nodePositions[node.parent_id], pos, color);
+        // 生成管线树枝 (Multi-Parent)
+        const parents = node.parent_ids || (node.parent_id ? [node.parent_id] : []);
+        parents.forEach(parentId => {
+            if (nodePositions[parentId]) {
+                const branch = createBranchLine(nodePositions[parentId], pos, color);
                 universeGroup.add(branch);
-                branchVisuals[node.node_id] = branch;
+                // 使用组合ID避免覆盖
+                branchVisuals[`${parentId}_${node.node_id}`] = branch;
             }
-        }
+        });
     });
 }
 
@@ -422,21 +424,23 @@ export function updateActivePath(targetNodeId, universeTreeData) {
         const isActive = activePathSet.has(id);
         const node = nodeVisuals[id];
 
-        // 节点高亮：增加非活跃节点的可见度从 0.2 -> 0.4
+        // 节点高亮
         gsap.to(node.material, {
             opacity: isActive ? 1.0 : 0.4,
             size: isActive ? 1.2 : 0.75,
             duration: 0.6
         });
-
-        if (branchVisuals[id]) {
-            const branch = branchVisuals[id];
-            gsap.to(branch.material, {
-                opacity: isActive ? 0.8 : 0.25, // 从 0.1 -> 0.25
-                duration: 0.6
-            });
-        }
     });
 
+    Object.keys(branchVisuals).forEach(branchKey => {
+        // branchKey is "parent_child"
+        const [pid, cid] = branchKey.split('_');
+        const isActive = activePathSet.has(pid) && activePathSet.has(cid);
+
+        gsap.to(branchVisuals[branchKey].material, {
+            opacity: isActive ? 0.8 : 0.25,
+            duration: 0.6
+        });
+    });
     highlightNode(targetNodeId, true);
 }

@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "node-fetch": "^2.7.0"
   },
   "engines": {
     "node": ">=22"

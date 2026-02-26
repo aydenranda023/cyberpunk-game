@@ -2,50 +2,31 @@ import { initUniverse3D, buildUniverseGraph, updateActivePath } from './universe
 import { renderChronicle } from './chronicle.js';
 import { renderEventLines } from './event_lines.js';
 
+// Base API URL to support running the frontend via Live Server (port 5500) while the backend is on 3000
+const API_BASE = window.location.port === '3000' || window.location.port === '' ? '' : 'http://localhost:3000';
+
 let universeMap = {};
 let universeDataArray = [];
 let currentNodeId = null;
 let crucibleItems = [];
 
-// 模拟的 3 条 2D 地铁图数据
-const mockEventLines = [
-    {
-        id: "track_v", name: "CHARACTER // 维（V）", color: "var(--track-char)",
-        nodes: [
-            { id: "e1", title: "记忆苏醒", timeX: 10 },
-            { id: "e2", title: "遭遇伏击", timeX: 35 },
-            { id: "e3", title: "义体过载", timeX: 70 }
-        ]
-    },
-    {
-        id: "track_arasaka", name: "LOCATION // 荒坂塔废墟", color: "var(--track-loc)",
-        nodes: [
-            { id: "e4", title: "底层封锁", timeX: 20 },
-            { id: "e5", title: "数据泄露", timeX: 55 }
-        ]
-    },
-    {
-        id: "track_relic", name: "ITEM // 损坏的 Relic", color: "var(--track-item)",
-        nodes: [
-            { id: "e6", title: "获取芯片", timeX: 15 },
-            { id: "e7", title: "防火墙崩溃", timeX: 50 },
-            { id: "e8", title: "意识融合", timeX: 85 }
-        ]
-    }
-];
+// Dynamic event lines will be loaded from the server
 
 function linkNodesForMap(nodes) {
     nodes.forEach(n => { n.children_ids = []; });
     nodes.forEach(n => {
-        if (n.parent_id && universeMap[n.parent_id]) {
-            universeMap[n.parent_id].children_ids.push(n.node_id);
-        }
+        const parents = n.parent_ids || (n.parent_id ? [n.parent_id] : []);
+        parents.forEach(pid => {
+            if (universeMap[pid]) {
+                if (!universeMap[pid].children_ids) universeMap[pid].children_ids = [];
+                universeMap[pid].children_ids.push(n.node_id);
+            }
+        });
     });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchUniverseTree();
-    renderEventLines('event-lines-container', mockEventLines);
     setupDragAndDrop();
     setupSynthesizeButton();
     setupCardCloseBtn();
@@ -76,13 +57,18 @@ function setupHeaderToggles() {
 
 async function fetchUniverseTree() {
     try {
-        const res = await fetch(`http://localhost:3000/api/debug/tree?_t=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`${API_BASE}/api/debug/tree?_t=${Date.now()}`, { cache: "no-store" });
         const data = await res.json();
 
         universeMap = {};
         universeDataArray = data.tree_data;
         data.tree_data.forEach(n => { universeMap[n.node_id] = n; });
         linkNodesForMap(data.tree_data);
+
+        // Render dynamic event lines from backend
+        if (data.event_lines) {
+            renderEventLines('event-lines-container', data.event_lines);
+        }
 
         // 绑定 3D 节点点击事件
         initUniverse3D('universe-canvas', handleNodeClick, toggleUIVisibility);
@@ -139,17 +125,28 @@ function focusNode(nodeId) {
     updateActivePath(nodeId, universeDataArray);
 
     let path = [];
-    let curr = nodeId;
-    while (curr) {
-        if (universeMap[curr]) {
-            path.unshift(universeMap[curr]);
-            curr = universeMap[curr].parent_id;
-        } else break;
+    let visited = new Set();
+
+    // BFS/DFS path discovery for multi-parent DAG
+    function buildPath(id) {
+        if (!id || visited.has(id)) return;
+        visited.add(id);
+        const n = universeMap[id];
+        if (n) {
+            path.unshift(n);
+            const nextParents = n.parent_ids || (n.parent_id ? [n.parent_id] : []);
+            if (nextParents.length > 0) buildPath(nextParents[0]); // Simple linear history for log
+        }
     }
+    buildPath(nodeId);
 
-    renderChronicle(path);
+    renderChronicle(path, (id) => focusNode(id));
 
-    // 更新 HUD
+    // Update HUD and Event Lines (Dynamically from latest state)
+    updateHUD(node);
+}
+
+function updateHUD(node) {
     const tLvl = node.state_snapshot?.tension_level || 0;
     const hudTension = document.getElementById('hud-tension');
     if (hudTension) hudTension.innerText = tLvl;
@@ -225,25 +222,65 @@ function setupSynthesizeButton() {
     updateSynthesizeButton();
     const btn = document.getElementById('btn-synthesize');
     if (!btn) return;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         if (crucibleItems.length === 0) return;
         btn.innerText = 'SYNTHESIZING...';
         btn.disabled = true;
 
-        setTimeout(() => {
-            alert("Synthesized: " + crucibleItems.join(', '));
-            document.querySelectorAll('.dock-card-item').forEach(el => el.remove());
-            crucibleItems = [];
-            checkDockEmptyState();
+        try {
+            // Collect parent node IDs for each involved track
+            // In Phase 2, we use the latest node from each involved track
+            const parentNodeIds = crucibleItems.map(tid => {
+                // Find the latest node that involved this track
+                const trackNodes = universeDataArray.filter(n => n.involved_tracks && n.involved_tracks.includes(tid));
+                return trackNodes.length > 0 ? trackNodes[trackNodes.length - 1].node_id : "genesis_000";
+            });
+
+            const res = await fetch(`${API_BASE}/api/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    parent_node_ids: [...new Set(parentNodeIds)], // Unique parents
+                    involved_tracks: crucibleItems,
+                    player_action: "进行高维合成反应"
+                })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                // Refresh UI
+                await fetchUniverseTree();
+
+                // Clear Dock
+                document.querySelectorAll('.dock-card-item').forEach(el => el.remove());
+                crucibleItems = [];
+                checkDockEmptyState();
+            }
+        } catch (e) {
+            console.error("Synthesis failed:", e);
+        } finally {
             btn.innerText = 'SYNTHESIZE / 合成推演';
             updateSynthesizeButton();
-        }, 1000);
+        }
     });
 }
 
 function toggleHUD() {
     const card = document.getElementById('node-info-card');
     if (card) card.classList.add('hidden');
+}
+
+/**
+ * 渲染左侧编年史日志
+ */
+function updateChronicleView(nodeId) {
+    const path = getPathToRoot(nodeId);
+    // 逆序，从根节点到当前节点显示
+    const chronologicalPath = [...path].reverse();
+    renderChronicle(chronologicalPath, (id) => {
+        // 当用户点击日志项时，同步更新 3D 视角和 2D 轨道
+        focusNode(id);
+    });
 }
 
 function showNodeInfoCard(nodeId) {
@@ -282,7 +319,7 @@ window.testJump = function () { alert("Jump planned."); };
 window.resetUniverse = async function () {
     if (!confirm("Reset timeline?")) return;
     try {
-        await fetch('http://localhost:3000/api/debug/reset', { method: 'POST' });
+        await fetch(`${API_BASE}/api/debug/reset`, { method: 'POST' });
         window.location.reload();
     } catch (e) { alert("Fail: " + e.message); }
 };

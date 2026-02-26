@@ -7,14 +7,16 @@
 
 #chronicle-content {
     flex: 1;
-    padding: 24px;
+    padding: 30px 40px;
+    /* More generous padding for manuscript feel */
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    font-size: 0.98rem;
-    line-height: 1.7;
-    color: #333;
+    gap: 32px;
+    /* Wider gap between paragraphs */
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--text-main);
 }
 
 /* Custom Scrollbar for Chronicle */
@@ -32,16 +34,73 @@
 }
 
 .log-entry {
-    background: rgba(255, 255, 255, 0.4);
-    padding: 16px 20px;
+    position: relative;
+    background: transparent;
+    padding: 10px 0;
+    /* Minimal padding by default */
     border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.03);
-    transition: transform 0.2s;
+    border: 1px solid transparent;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
 }
 
-.log-entry:hover {
-    background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+.log-entry:hover,
+.log-entry.active {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    margin: -10px -20px;
+    /* Offset the padding to prevent text jump */
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: var(--shadow-soft);
+}
+
+.entry-meta {
+    display: block;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-top: 0;
+}
+
+.log-entry:hover .entry-meta,
+.log-entry.active .entry-meta {
+    max-height: 100px;
+    opacity: 1;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-light);
+}
+
+.branch-tag {
+    color: var(--accent-blue);
+    font-weight: 700;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    display: none;
+    /* Hide branch tag by default */
+}
+
+.log-entry:hover .branch-tag,
+.log-entry.active .branch-tag {
+    display: block;
+}
+
+.element-capsule {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-light);
+    margin-right: 4px;
+    font-size: 0.7rem;
 }
 
 .log-entry.system-msg {

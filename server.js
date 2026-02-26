@@ -1,171 +1,223 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch'; // Ensure fetch is available in Node
 
 dotenv.config({ path: '.env.local' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 中间件：解析 JSON 请求体和开启跨域
 app.use(cors());
 app.use(express.json());
-
-// 静态文件托管（必须加上这一句，浏览器才能访问到 public 目录下的文件）
 app.use(express.static('public'));
 
-// 【核心数据结构】：基于 DAG 树状数据结构的多元宇宙状态机
-// 内存数组用于存储所有的节点 (Node)，Phase 1 暂存本地内存中
+/**
+ * PHASE 2 CORE DATA STRUCTURES
+ */
 let universeTree = [];
+let eventLinesRegistry = {};
 
-// 【根节点初始化】(仅供示例测试用)
-const genesisNode = {
-    node_id: "genesis_000",
-    parent_id: null,
-    universe_tag: "Cyberpunk",
-    state_snapshot: {
-        global_summary: "故事从夜之城的一个雨夜开始...",
-        tension_level: 10,
-        current_objective: "生存下去"
-    },
-    narrative_text: "雨水打在街角闪烁的霓虹招牌上，你刚刚脱离了荒坂的追捕。在这个十字路口，三条微弱的信号正在你的神经链路中闪烁。",
-    player_status: { hp: 100 }
-};
+let initPromise = null;
 
-// 构造后续测试树节点以显示分支
-const testNode1 = {
-    node_id: "node_test_001",
-    parent_id: "genesis_000",
-    universe_tag: "Cyberpunk",
-    state_snapshot: { tension_level: 25, current_objective: "寻找避难所" },
-    narrative_text: "你选择向左拐入黑客聚集的小巷（蓝色轨道：人物线）。在这里你遇到了中间人 Dex。",
-    player_status: { hp: 100 }
-};
-
-const testNode2 = {
-    node_id: "node_test_002",
-    parent_id: "genesis_000",
-    universe_tag: "Cyberpunk",
-    state_snapshot: { tension_level: 40, current_objective: "调查废墟" },
-    narrative_text: "你径直走向了远方的高塔（橙色轨道：地点线），那里曾是旧日集团的研究所废墟。",
-    player_status: { hp: 100 }
-};
-
-const testNode3 = {
-    node_id: "node_test_003",
-    parent_id: "node_test_001",
-    universe_tag: "Cyberpunk",
-    state_snapshot: { tension_level: 55, current_objective: "破解芯片" },
-    narrative_text: "Dex 递给你一块加密芯片（绿色轨道：物品线）。你接过了它，开始尝试破解里面的防火墙。",
-    player_status: { hp: 100 }
-};
-
-const testNode4 = {
-    node_id: "node_test_004",
-    parent_id: "node_test_003",
-    universe_tag: "Wasteland", // 测试一下变异世界颜色
-    state_snapshot: { tension_level: 80, current_objective: "逃脱思维腐蚀" },
-    narrative_text: "芯片中潜藏着致命的守护程序！你的意识被强行拉扯，坠入了一片精神荒原。周围是漫天的辐射尘埃...",
-    player_status: { hp: 60 }
-};
-
-universeTree.push(genesisNode, testNode1, testNode2, testNode3, testNode4);
-
-
-// 核心算法：上下文溯源机制 (Context Retrieval)
-// 根据传入的最末端 current_node_id，沿着 parent_id 向上查找最多 limit 个节点
-function getHistoryChain(startNodeId, limit = 3) {
-    let chain = [];
-    let currentId = startNodeId;
-
-    while (currentId && chain.length < limit) {
-        // 在宇宙树中寻找对应的节点
-        const node = universeTree.find(n => n.node_id === currentId);
-        if (!node) break; // 找不到说明断链了或者到源头了
-
-        // 插入到数组开头，保证最古老的在上，最新（当前）的在下
-        chain.unshift(node);
-
-        // 指针上移
-        currentId = node.parent_id;
-    }
-    return chain;
-}
-
-// 【核心路由】：接收前端动作，调用 DeepSeek API 并解析返回的 JSON
-app.post('/api/action', async (req, res) => {
+async function generateGenesisNode() {
     try {
-        // 解构新的 payload 结构
-        const { current_node_id, player_action, action_type = 'continue', target_universe } = req.body;
-
-        if (!current_node_id || !player_action) {
-            return res.status(400).json({ error: "缺少 current_node_id 或 player_action 参数" });
-        }
-
-        // 1. 获取当前操作锚点的节点状态 (最为最新世界状态)
-        const currentNode = universeTree.find(n => n.node_id === current_node_id);
-        if (!currentNode) {
-            return res.status(404).json({ error: "未找到指定的起点节点(Universe Node)" });
-        }
-
-        // 2. 上下文溯源 (Context Retrieval) 提取最近 N 个回合作为纯净上下文
-        const historyNodes = getHistoryChain(current_node_id, 3);
-        const historyTextContext = historyNodes.map((n, idx) => {
-            return `【历史回合 ${idx + 1} - 宇宙维度: ${n.universe_tag}】\n剧情描述: ${n.narrative_text}`;
-        }).join('\n\n');
-
-        // 3. 构建 System Prompt 和 User Prompt
-        let systemPrompt = `你是一个掌控全局的地牢主宰 (DM)。
-请根据玩家的动作，推进多元宇宙剧情，并强制严格返回符合以下结构的 JSON 格式数据：
+        console.log("Generating dynamic genesis node...");
+        const systemPrompt = `你是一个高维叙事创世神。请构思一个极具张力的随机赛博朋克/科幻故事开局，并从中抽象出3个关键的基础事件线实体（建议包含1个人物，1个地点，1个物品或势力）。
+请严格返回以下 JSON 格式：
 {
-  "director_notes": "DM的思考过程：分析当前局势和威胁...",
-  "state_update": {
-    "global_summary": "精简前情提要...",
-    "tension_change": 20,
-    "new_objective": "...",
-    "new_facts": []
-  },
-  "views": {
-    "narrative": "具体展现给玩家的剧情文本..."
-  },
-  "choices": [
-    { "text": "必须要高度贴合当前情况的动态选项 A，字数简捷有力，例如：[拔枪反击]" },
-    { "text": "必须要高度贴合当前情况的动态选项 B（代表不同的行动流派），例如：[寻找掩护并尝试黑入系统]" }
+  "narrative_text": "极具画面感的初始故事片段，包含环境文字和当前主要矛盾（50-100字）...",
+  "event_lines": [
+    {
+      "name": "CHARACTER // [角色名]", 
+      "color": "var(--track-char)", 
+      "initial_state": "该实体当前的简短状态(5-10字)"
+    },
+    {
+      "name": "LOCATION // [地点名]", 
+      "color": "var(--track-loc)", 
+      "initial_state": "当前状态"
+    },
+    {
+      "name": "ITEM // [物品或势力名]", 
+      "color": "var(--track-item)", 
+      "initial_state": "当前状态"
+    }
   ]
 }
-注意：每次生成的 choices 必须根据当前剧情变化，绝对不能重复旧的两个选项！`;
+注意：color 字段请尽可能使用 var(--track-char), var(--track-loc), var(--track-item) 等预设变量。`;
 
-        // 根据不同的动作类型 (action_type) 注入特殊规则或修改目标 Tag
-        let newUniverseTag = currentNode.universe_tag;
-        let specialRules = "";
+        const aiResponse = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: "生成一个新的宇宙纪元起点。" }
+                ],
+                response_format: { type: 'json_object' }
+            })
+        });
 
-        if (action_type === 'jump') {
-            if (!target_universe) {
-                return res.status(400).json({ error: "执行 jump 必须提供 target_universe 参数" });
+        const data = await aiResponse.json();
+        if (!data.choices || !data.choices[0]) {
+            console.error("Unexpected AI response in generateGenesisNode:", JSON.stringify(data, null, 2));
+            throw new Error("Invalid AI response format");
+        }
+        const aiResult = JSON.parse(data.choices[0].message.content);
+
+        eventLinesRegistry = {};
+        const tracksState = {};
+        const involvedTracks = [];
+
+        aiResult.event_lines.forEach((line, index) => {
+            const trackId = `track_${index}_${Date.now()}`;
+            eventLinesRegistry[trackId] = {
+                name: line.name,
+                color: line.color,
+                latest_node_id: "genesis_000",
+                current_state: line.initial_state
+            };
+            tracksState[trackId] = line.initial_state;
+            involvedTracks.push(trackId);
+        });
+
+        const genesisNode = {
+            node_id: "genesis_000",
+            parent_ids: [],
+            universe_tag: "Cyberpunk",
+            involved_tracks: involvedTracks,
+            state_snapshot: {
+                tension_level: 10,
+                tracks_state: tracksState
+            },
+            narrative_text: "【系统初始化：新纪元开启】\n\n" + aiResult.narrative_text,
+            director_notes: "根据高维指令，自发诞生了新宇宙的初始约束条件。"
+        };
+
+        universeTree = [genesisNode];
+        console.log("Genesis node generated successfully.");
+    } catch (e) {
+        console.error("Failed to generate dynamic genesis node, using fallback:", e);
+        fallbackStaticGenesis();
+    }
+}
+
+function fallbackStaticGenesis() {
+    eventLinesRegistry = {
+        "track_v": { name: "CHARACTER // 维（V）", color: "var(--track-char)", latest_node_id: "genesis_000", current_state: "刚刚脱离荒坂追捕" },
+        "track_arasaka": { name: "LOCATION // 荒坂塔废墟", color: "var(--track-loc)", latest_node_id: "genesis_000", current_state: "底层封锁中" },
+        "track_relic": { name: "ITEM // 损坏的 Relic", color: "var(--track-item)", latest_node_id: "genesis_000", current_state: "防火墙稳固" }
+    };
+    universeTree = [{
+        node_id: "genesis_000",
+        parent_ids: [],
+        universe_tag: "Cyberpunk",
+        involved_tracks: ["track_v", "track_arasaka", "track_relic"],
+        state_snapshot: {
+            tension_level: 10,
+            tracks_state: {
+                "track_v": "刚刚脱离荒坂追捕",
+                "track_arasaka": "底层封锁中",
+                "track_relic": "防火墙稳固"
             }
-            newUniverseTag = target_universe;
-            specialRules = `\n\n【系统最高指令：维度跳跃触发！】
-玩家试图从当前的 [${currentNode.universe_tag}] 宇宙，强行开启传送门跳跃到 [${target_universe}] 宇宙！
-请在 \`views.narrative\` 中重点描写空间撕裂的感官冲击。必须保留玩家的残血和物品现状（从上下文中推断），但环境背景必须瞬间切换至目标宇宙 (${target_universe}) 的风格。`;
+        },
+        narrative_text: "系统初始化：神经链路已建立。故事从夜之城的一个雨夜开始。你手持那块致命的芯片，站在荒坂塔的阴影下。",
+        director_notes: "Fallback static genesis."
+    }];
+}
+
+async function ensureInitialized() {
+    if (universeTree.length > 0) return;
+    if (!initPromise) {
+        initPromise = generateGenesisNode();
+    }
+    await initPromise;
+    initPromise = null;
+}
+
+/**
+ * CONTEXT RETRIEVAL (Phase 2 Multi-Parent Logic)
+ */
+function getMultiContext(parentNodeIds) {
+    let contextParts = [];
+    parentNodeIds.forEach(id => {
+        const node = universeTree.find(n => n.node_id === id);
+        if (node) {
+            contextParts.push(`[来源节点 ${id} / 类型: ${node.universe_tag}]\n历史描述: ${node.narrative_text}`);
+        }
+    });
+    return contextParts.join('\n\n');
+}
+
+/**
+ * CORE API: SYNTHESIZE ACTION
+ */
+app.post('/api/action', async (req, res) => {
+    try {
+        const { parent_node_ids, player_action, involved_tracks } = req.body;
+
+        if (!parent_node_ids || !Array.isArray(parent_node_ids) || parent_node_ids.length === 0) {
+            return res.status(400).json({ error: "必须提供 parent_node_ids 数组" });
         }
 
-        // 组装最终给 AI 的用户输入报文
+        // 1. ANOMALY DETECTION (检测是否使用了历史节点)
+        let anomalies = [];
+        involved_tracks.forEach(trackId => {
+            const registry = eventLinesRegistry[trackId];
+            if (registry) {
+                // 如果传入的父节点中不包含该轨道的 latest_node_id，说明在提取“过去”的状态
+                if (!parent_node_ids.includes(registry.latest_node_id)) {
+                    anomalies.push(`[${registry.name}]`);
+                }
+            }
+        });
+
+        const anomalyWarning = anomalies.length > 0
+            ? `\n\n【时空异常警告】：以下元素提取自过去的时空状态，请在叙事中以“回忆”、“数据库记录”或“回响”的形式圆场：${anomalies.join(', ')}`
+            : "";
+
+        // 2. CONTEXT BUILDING
+        const historyContext = getMultiContext(parent_node_ids);
+
+        // 提取参与轨道的当前状态供 AI 参考
+        let currentStatesContext = involved_tracks.map(tid => {
+            return `- ${eventLinesRegistry[tid]?.name || tid}: ${eventLinesRegistry[tid]?.current_state || "未知"}`;
+        }).join('\n');
+
+        const systemPrompt = `你是一个高维叙事指挥家。
+玩家将多个实体（事件线）拖入合成釜进行剧情推演。
+请严格返回以下 JSON 格式：
+{
+  "director_notes": "思考如何缝合这些元素...",
+  "narrative_text": "合成后的高品质剧情文本...",
+  "event_lines_update": {
+    "track_id_xxx": "该实体在该剧情后的新状态简述 (5-10字)",
+    "track_id_yyy": "..."
+  },
+  "tension_change": 15
+}
+注意：narrative_text 应该侧重于这些元素碰撞后的化学反应。`;
+
         const userPrompt = `
-======== 世界当前状态 ========
-【当前环境】: ${currentNode.universe_tag}
-【最近故事线记忆】：
-${historyTextContext}
-【DM备忘】：上回合结束时的紧张度是 ${currentNode.state_snapshot.tension_level}，玩家的目标是 ${currentNode.state_snapshot.current_objective}。
+======== 参与合成的元素状态 ========
+${currentStatesContext}
 
-======== 玩家实时输入 ========
-${specialRules}
-[玩家动作]: ${player_action}
+======== 历史脉络上下文 ========
+${historyContext}
+${anomalyWarning}
 
-请严格输出 JSON！不需要输出包含 \`\`\`json\`\`\` 的代码块，直接输出 JSON 大括号结构！
+======== 指挥家指令 (玩家动作) ========
+${player_action || "让这些元素自行发生反应"}
+
+请严格输出 JSON！直接输出大括号结构。
 `;
 
-        // 4. 调用 DeepSeek API
-        const response = await fetch('https://api.deepseek.com/chat/completions', {
+        const aiResponse = await fetch('https://api.deepseek.com/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -181,85 +233,89 @@ ${specialRules}
             })
         });
 
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`DeepSeek API error: ${response.status} - ${errorBody}`);
-        }
+        const data = await aiResponse.json();
+        const aiResult = JSON.parse(data.choices[0].message.content);
 
-        const data = await response.json();
-
-        // 提取 AI 生成的文本并解析为 JSON 对象
-        const aiResponseText = data.choices[0].message.content;
-        console.log("DeepSeek Raw Output:", aiResponseText);
-
-        let aiParsedResult;
-        try {
-            aiParsedResult = JSON.parse(aiResponseText);
-        } catch (e) {
-            throw new Error("AI 返回的数据无法解析为合格的 JSON: " + aiResponseText);
-        }
-
-        // 5. 组装产生全新的节点 (Node)
+        // 3. CREATE NEW CONVERGENCE NODE
         const newNodeId = `node_${Date.now()}`;
+        const prevTension = universeTree.find(n => n.node_id === parent_node_ids[0])?.state_snapshot?.tension_level || 0;
 
-        // 【核心跳跃/分支逻辑】：只要新建节点的 parent_id 指向传进来的锚点，
-        // 无论是顺流向下 (continue)，还是时间分叉回到过去 (branch)，或者跨维跳跃 (jump)
-        // 就都完美契合了 DAG 树状追加原则！
         const newNode = {
             node_id: newNodeId,
-            parent_id: current_node_id,
-            universe_tag: newUniverseTag, // continue和branch继承旧tag，jump则已被修改为目标tag
+            parent_ids: parent_node_ids,
+            universe_tag: "Convergence",
+            involved_tracks: involved_tracks,
             state_snapshot: {
-                ...aiParsedResult.state_update,
-                // 为了安全，强制继承并累加之前的数值（因为AI有时候会忘记计算累加）
-                tension_level: Math.max(0, Math.min(100, currentNode.state_snapshot.tension_level + (aiParsedResult.state_update.tension_change || 0)))
+                tension_level: Math.max(0, Math.min(100, prevTension + (aiResult.tension_change || 5))),
+                tracks_state: { ...aiResult.event_lines_update }
             },
-            narrative_text: aiParsedResult.views.narrative,
-            choices: aiParsedResult.choices || [], // 【修复】必须把 AI 生成的动态选项保存进历史记录！
-            player_status: {
-                ...currentNode.player_status // Phase 2暂时简单继承玩家状态
-            }
+            narrative_text: aiResult.narrative_text,
+            director_notes: aiResult.director_notes
         };
 
-        // 将新节点存入全局树中
+        // 4. UPDATE REGISTRY (反向写回)
+        involved_tracks.forEach(tid => {
+            if (eventLinesRegistry[tid]) {
+                eventLinesRegistry[tid].latest_node_id = newNodeId;
+                if (aiResult.event_lines_update[tid]) {
+                    eventLinesRegistry[tid].current_state = aiResult.event_lines_update[tid];
+                }
+            }
+        });
+
         universeTree.push(newNode);
 
-        // 6. 组装最终结果返回给前端
         res.status(200).json({
             success: true,
-            node_created: newNode,
-            ai_thoughts: aiParsedResult.director_notes
+            node_created: newNode
         });
 
-    } catch (error) {
-        console.error("处理动作期间发生错误:", error);
-        res.status(500).json({
-            success: false,
-            error: "内部服务器错误或 JSON 解析失败",
-            details: error.message
-        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
+/**
+ * DEBUG ROUTES
+ */
+app.get('/api/debug/tree', async (req, res) => {
+    await ensureInitialized();
+    // Dynamically build the event tracks based on the current universe tree
+    const tracksData = Object.keys(eventLinesRegistry).map(trackId => {
+        const trackDef = eventLinesRegistry[trackId];
+        // Find all nodes that involve this track
+        const trackNodes = universeTree.filter(n => n.involved_tracks && n.involved_tracks.includes(trackId));
 
-// 辅助路由：重置并清空宇宙树 (从零开始)
-app.post('/api/debug/reset', (req, res) => {
-    universeTree = [genesisNode, testNode1, testNode2, testNode3, testNode4];
-    res.json({ success: true, message: "宇宙已重置为测试初始状态" });
-});
+        return {
+            id: trackId,
+            name: trackDef.name,
+            color: trackDef.color,
+            nodes: trackNodes.map((n, index) => ({
+                id: n.node_id,
+                title: n.state_snapshot?.tracks_state?.[trackId] || (index === 0 ? trackDef.current_state : "状态更新"),
+                // Generate a generic sequential timeX for layout purposes (can be improved later)
+                timeX: 10 + (index * 25)
+            }))
+        };
+    });
 
-// 辅助路由：方便开发者在浏览器里直接查看 universeTree 的全貌
-app.get('/api/debug/tree', (req, res) => {
     res.json({
         total_nodes: universeTree.length,
-        tree_data: universeTree
+        tree_data: universeTree,
+        registry: eventLinesRegistry,
+        event_lines: tracksData
     });
 });
 
+app.post('/api/debug/reset', async (req, res) => {
+    universeTree = []; // Clear tree
+    eventLinesRegistry = {};
+    await ensureInitialized(); // Generate new genesis
+    res.json({ success: true, message: "宇宙已重置并重新生成了初始起点" });
+});
 
-app.listen(PORT, () => {
-    console.log(`===============================================`);
-    console.log(` Neural Link (Phase 1 MVP) 宇宙引擎已启动 `);
-    console.log(` 服务器运行在: http://localhost:${PORT}`);
-    console.log(`===============================================`);
+app.listen(PORT, async () => {
+    console.log(`Neural Link Phase 2 Engine running at http://localhost:${PORT}`);
+    await ensureInitialized(); // Start generating initial node quietly in the background
 });

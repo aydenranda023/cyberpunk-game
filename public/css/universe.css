@@ -233,7 +233,8 @@ body {
 /* Synthesis Dock */
 #synthesis-dock-container {
     position: absolute;
-    bottom: 30px;
+    bottom: 420px;
+    /* Elevated to sit above the collapsed #lower-view header (50px) */
     right: 30px;
     width: 320px;
     background: rgba(255, 255, 255, 0.7);
